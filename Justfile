@@ -109,8 +109,8 @@ scan-staged:
 # まとめてチェック (CI 向け)
 # ───────────────────────────────────────────
 
-# 型チェック + lint + フォーマット確認 + シークレットスキャンを一括実行
-check: typecheck lint format-check scan
+# 型チェック + lint + フォーマット確認 + シークレットスキャン + テストを一括実行
+check: typecheck lint format-check scan test
 
 # ───────────────────────────────────────────
 # テスト
@@ -118,11 +118,15 @@ check: typecheck lint format-check scan
 
 # Jest テストを実行
 test:
-    ./node_modules/.bin/jest
+    npx jest --passWithNoTests
+
+# カバレッジ付きでテスト
+test-coverage:
+    npx jest --coverage
 
 # ウォッチモードでテスト
 test-watch:
-    ./node_modules/.bin/jest --watch
+    npx jest --watch
 
 # ───────────────────────────────────────────
 # 依存関係
