@@ -1,0 +1,119 @@
+#+TITLE: React Native Modern Architecture Design Document
+#+AUTHOR: Watanabe Jun
+#+DATE: 2026-06-14
+#+OPTIONS: toc:nil num:t
+
+* 1. 概要 (Overview)
+本ドキュメントは、React Nativeにおけるモダンなアプリケーションアーキテクチャの設計指針をまとめたものである。
+従来のBridge基盤から脱却し、New Architecture、ファイルベースルーティング、およびサーバー状態管理を組み合わせることで、高いパフォーマンスとメンテナンス性を両立することを目的とする。
+
+* 2. 基盤レイヤー: New Architecture
+React Nativeの実行基盤は、従来の非同期Bridge通信からC++ベースの構造へと移行している。
+
+** 2.1 JSI (JavaScript Interface)
+- JavaScriptからネイティブ（iOS/Android）のC++オブジェクトを直接、同期的に参照・操作可能。
+- 通信オーバーヘッドが劇減。
+
+** 2.2 Fabric & TurboModules
+- *Fabric*: 新しいUI描画システム。スクロール時の白飛び防止や120FPS対応の滑らかなアニメーションを実現。
+- *TurboModules*: ネイティブ機能呼び出しの最適化。必要な時のみオンデマンドでロードされる。
+
+** 2.3 Nitro Modules
+- JSIをさらに極限まで高速化する次世代ライブラリ群。デバイス上での軽量AIモデル実行や重い処理もネイティブ並みの速度で動作可能。
+
+* 3. データ・状態管理アーキテクチャ
+「サーバーから取得したデータ（Server State）」と「アプリ内部のUIの状態（Client State）」を明確に切り離す。
+
+** 3.1 サーバー状態（Server State）
+- *推奨ライブラリ*: TanStack Query (React Query)
+- *役割*: APIからのデータ取得、キャッシュ、ローディング、リトライ、ページネーションの自動管理。
+- *メリット*: 開発者が非同期処理のRedux Boilerplateを記述する必要がなくなる。
+
+** 3.2 クライアント状態（Client State）
+- *推奨ライブラリ*: Zustand
+- *役割*: モーダルの開閉、ダークモード切り替え、フォームの一時入力値などの管理。
+- *メリット*: 軽量、Hookベースで直感的に記述可能、Context APIのような不要な再レンダリングが発生しない。
+
+* 4. ディレクトリ構造・設計パターン
+
+** 4.1 Featuresベース（機能駆動型）アーキテクチャ
+コンポーネントの種類（components/, screens/）で分けるのではなく、機能（ドメイン）単位でフォルダをカプセル化する。
+Expo Router の制約上、ルートファイルは =app/= 直下に置く必要があるため、=src/= は設けず以下の構成を採用する。
+
+#+BEGIN_SRC text
+/ (プロジェクトルート)
+├── app/                    # Expo Router ファイルベースルーティング
+│   ├── _layout.tsx         # ルートスタック設定
+│   ├── (tabs)/             # タブグループ
+│   │   ├── _layout.tsx
+│   │   └── index.tsx       # 難易度選択画面（初期画面）
+│   └── quiz.tsx            # クイズ画面
+├── assets/                 # 画像・フォントなど
+├── components/             # アプリ全体で共通のUI（Themed.tsx など）
+├── constants/              # カラートークンなどのアプリ定数
+├── features/               # 機能ごとに閉じたカプセル
+│   └── quiz/               # クイズ機能ドメイン
+│       ├── __tests__/      # クイズ機能のテスト群
+│       ├── components/     # クイズ機能固有のUIコンポーネント
+│       │   └── LevelStepper.tsx
+│       ├── types.ts        # 型定義（DifficultyLevel など）
+│       ├── constants.ts    # ドメイン定数（DIFFICULTY_LEVELS など）
+│       └── index.ts        # 外部に公開するインターフェース
+└── jest.setup.ts           # Jest セットアップ（モック初期化）
+#+END_SRC
+
+** 4.2 ロジックとUIの分離（Hooksパターン）
+- *UIコンポーネント*: 状態を持たず、propsを受け取ってレンダリングする（Viewに集中）。
+- *カスタムHook*: ~useProfile.ts~ のようなHookを作り、そこにTanStack Queryの呼び出しや状態遷移のロジックを閉じ込める。
+
+* 5. ルーティング (Routing)
+- *推奨ツール*: Expo Router
+- *設計*: ファイルシステムベースのルーティング（Next.jsやRemixと同等）。
+- *メリット*: ディレクトリ構造がそのまま画面遷移の階層になるため、従来の ~react-navigation~ で発生していた複雑なネスト構造の定義ファイル（Navigatorのネスト）を記述する必要がなくなる。
+
+* 6. 推奨技術スタックまとめ
+| レイヤー             | 推奨される技術・パターン                                 |
+|----------------------+----------------------------------------------------------|
+| ベースフレームワーク | Expo (New Architecture有効) + TypeScript                 |
+| ルーティング         | Expo Router (ファイルシステムベース)                     |
+| サーバー状態管理     | TanStack Query                                           |
+| グローバル状態管理   | Zustand                                                  |
+| ディレクトリ設計     | Featuresベース + Hooksによるロジック分離                  |
+| アニメーション       | react-native-reanimated v4 (useSharedValue + withSpring) |
+| テスト               | Jest + @testing-library/react-native v14                 |
+
+* 7. テスト戦略
+
+** 7.1 テストピラミッド
+テスタビリティを最大化するため、以下の3層構造を採用する。
+
+#+BEGIN_SRC text
+        ▲ Integration Tests  （少数・画面をまたぐ操作フローを検証）
+       ▲▲▲ Component Tests   （中程度・ユーザー操作と振る舞いを検証）
+    ▲▲▲▲▲▲▲ Unit Tests       （多数・高速・純粋なドメインロジック）
+#+END_SRC
+
+| 層          | 対象                          | ツール                        |
+|-------------+-------------------------------+-------------------------------|
+| Unit        | types.ts / constants.ts など  | Jest（React 不要・超高速）    |
+| Component   | LevelStepper など             | @testing-library/react-native |
+| Integration | 画面遷移・router.push の検証   | @testing-library/react-native |
+
+** 7.2 テスタビリティ原則
+1. *実装詳細をテストしない* — アニメーションの内部状態（=translateX.value= など）は検証しない。「ユーザーが見て操作できること」を軸にする。
+2. *=getByRole= / =getByLabelText= ファースト* — アクセシビリティ属性で要素を特定し、DOM 構造変更に強いテストにする。=getByTestId= は最終手段。
+3. *アニメーションはモック* — Reanimated の =setUpTests()= でモック化し、アニメーション完了を待たずに振る舞いをテストする。
+4. *ロジックをアニメーションから分離* — 状態更新（=onIndexChange= 等）をアニメーションコールバックの外で先に呼ぶことで、テスト環境でも確実に動作させる。
+5. *CI に統合* — =just check= にテストを組み込み、リグレッションを自動検知する。
+
+** 7.3 テスト環境セットアップ
+- *=jest.setup.ts=*: テストスイート前に実行される初期化ファイル。以下をモック化する。
+  - =react-native-reanimated=: =setUpTests()= でアニメーションを同期的な実装に差し替え
+  - =expo-router=: =router.push= / =useLocalSearchParams= を Jest の spy に差し替え
+  - =expo-font= / =expo-splash-screen=: ネイティブ依存を排除
+  - =react-native-safe-area-context=: =SafeAreaView= を =View= ラッパーに差し替え
+- *Jest 設定（package.json）*:
+  - =moduleNameMapper=: =@/*= エイリアスをプロジェクトルートに解決
+  - =transformIgnorePatterns=: reanimated / worklets を Jest の transform 対象に含める
+  - =setupFilesAfterEnv=: =jest.setup.ts= を指定
+  - =collectCoverageFrom=: =features/=, =app/=, =components/= を対象にカバレッジ計測
