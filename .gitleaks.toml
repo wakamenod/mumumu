@@ -1,0 +1,24 @@
+title = "mumumu gitleaks config"
+
+[extend]
+# 公式のデフォルトルールセットを継承
+useDefault = true
+
+[allowlist]
+description = "Project-level allowlist"
+
+# アセットファイルはハッシュ値・バイナリデータが含まれるため除外
+paths = [
+  '''assets/''',
+  '''node_modules/''',
+  '''package-lock\.json''',
+  '''\.expo/''',
+]
+
+# Expo / React Native のデフォルト設定値など既知の false-positive を除外
+regexes = [
+  # Expo scheme (app.json の "scheme" フィールドなど)
+  '''scheme.*mumumu''',
+  # スナップショットファイル内の擬似的なトークン文字列
+  '''__snapshots__''',
+]

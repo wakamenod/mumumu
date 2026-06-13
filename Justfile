@@ -94,11 +94,23 @@ format-check:
     npx prettier --check .
 
 # ───────────────────────────────────────────
+# セキュリティ (gitleaks)
+# ───────────────────────────────────────────
+
+# リポジトリ全体のシークレットスキャン
+scan:
+    gitleaks detect --config .gitleaks.toml --source . --redact --verbose
+
+# ステージ済みファイルのみスキャン (pre-commit と同じ)
+scan-staged:
+    gitleaks protect --config .gitleaks.toml --staged --redact --verbose
+
+# ───────────────────────────────────────────
 # まとめてチェック (CI 向け)
 # ───────────────────────────────────────────
 
-# 型チェック + lint + フォーマット確認を一括実行
-check: typecheck lint format-check
+# 型チェック + lint + フォーマット確認 + シークレットスキャンを一括実行
+check: typecheck lint format-check scan
 
 # ───────────────────────────────────────────
 # テスト
