@@ -4,8 +4,10 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { View } from 'react-native';
 import 'react-native-reanimated';
 
+import DebugBanner from '@/components/DebugBanner';
 import { useColorScheme } from '@/components/useColorScheme';
 
 export {
@@ -50,17 +52,21 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="quiz"
-          options={{
-            title: 'クイズ',
-            headerBackTitle: '難易度選択',
-          }}
-        />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
+      <View style={{ flex: 1 }}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="quiz"
+            options={{
+              title: 'クイズ',
+              headerBackTitle: '難易度選択',
+            }}
+          />
+          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        </Stack>
+        {/* 全画面の最前面にデバッグバナーを浮かせる */}
+        <DebugBanner />
+      </View>
     </ThemeProvider>
   );
 }
