@@ -70,3 +70,26 @@ jest.mock('react-native-safe-area-context', () => {
     useSafeAreaFrame: jest.fn(() => ({ x: 0, y: 0, width: 390, height: 844 })),
   };
 });
+
+// ─────────────────────────────────────────────────────────────
+// 6. Firebase SDK のモック
+//    firebase パッケージは ESM 形式のため Jest (CommonJS) では
+//    そのままパースできない。テストでは実際の接続が不要なため
+//    必要な API をスタブに差し替える。
+// ─────────────────────────────────────────────────────────────
+jest.mock('firebase/app', () => ({
+  initializeApp: jest.fn(() => ({})),
+  getApps: jest.fn(() => []),
+}));
+
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => ({})),
+  connectFunctionsEmulator: jest.fn(),
+  httpsCallable: jest.fn(() => jest.fn(() => Promise.resolve({ data: { questions: [] } }))),
+}));
+
+jest.mock('firebase/app-check', () => ({
+  initializeAppCheck: jest.fn(),
+  CustomProvider: jest.fn(),
+  getToken: jest.fn(),
+}));
