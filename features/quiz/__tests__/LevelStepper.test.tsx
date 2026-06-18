@@ -31,19 +31,19 @@ describe('LevelStepper', () => {
       expect(screen.getByText('小学1年生')).toBeTruthy();
     });
 
-    it('selectedIndex=8 のとき 大学生 が表示される', async () => {
+    it('selectedIndex=12 のとき 大学・一般 が表示される', async () => {
       await renderStepper(LAST_INDEX);
-      expect(screen.getByText('大学生')).toBeTruthy();
+      expect(screen.getByText('大学・一般')).toBeTruthy();
     });
 
-    it('「X / 9」の形式でカウンターが表示される', async () => {
+    it('「X / 13」の形式でカウンターが表示される', async () => {
       await renderStepper(0);
-      expect(screen.getByText('1 / 9')).toBeTruthy();
+      expect(screen.getByText('1 / 13')).toBeTruthy();
     });
 
     it('中間レベルではカウンターが正しく更新される', async () => {
       await renderStepper(4);
-      expect(screen.getByText('5 / 9')).toBeTruthy();
+      expect(screen.getByText('5 / 13')).toBeTruthy();
     });
   });
 

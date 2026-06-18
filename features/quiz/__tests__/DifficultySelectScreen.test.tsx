@@ -47,7 +47,7 @@ describe('DifficultySelectScreen', () => {
   });
 
   describe('スタートボタン', () => {
-    it('初期状態でスタートを押すと grade1 でクイズが始まる', async () => {
+    it('初期状態でスタートを押すと M でクイズが始まる', async () => {
       await render(<DifficultySelectScreen />);
 
       fireEvent.press(screen.getByText('▶　スタート！'));
@@ -55,11 +55,11 @@ describe('DifficultySelectScreen', () => {
       expect(mockPush).toHaveBeenCalledTimes(1);
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/quiz',
-        params: { levelId: 'grade1' },
+        params: { levelId: 'M' },
       });
     });
 
-    it('→ で1つ進めてからスタートすると grade2 で始まる', async () => {
+    it('→ で1つ進めてからスタートすると L で始まる', async () => {
       await render(<DifficultySelectScreen />);
 
       // state 更新を act() でラップして re-render を確実に完了させる
@@ -71,14 +71,14 @@ describe('DifficultySelectScreen', () => {
 
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/quiz',
-        params: { levelId: 'grade2' },
+        params: { levelId: 'L' },
       });
     });
 
-    it('→ を3回押してから grade4 でスタートできる', async () => {
+    it('→ を3回押してから J でスタートできる', async () => {
       await render(<DifficultySelectScreen />);
 
-      // 3回進める: grade1 → grade4
+      // 3回進める: M → J
       for (let i = 0; i < 3; i++) {
         await act(async () => {
           fireEvent.press(screen.getByLabelText('次のレベル'));

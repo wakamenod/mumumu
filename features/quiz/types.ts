@@ -1,13 +1,17 @@
 export type DifficultyId =
-  | 'grade1'
-  | 'grade2'
-  | 'grade3'
-  | 'grade4'
-  | 'grade5'
-  | 'grade6'
-  | 'middle'
-  | 'high'
-  | 'university';
+  | 'A'
+  | 'B'
+  | 'C'
+  | 'D'
+  | 'E'
+  | 'F'
+  | 'G'
+  | 'H'
+  | 'I'
+  | 'J'
+  | 'K'
+  | 'L'
+  | 'M';
 
 export interface DifficultyLevel {
   id: DifficultyId;

@@ -11,8 +11,8 @@ import { DIFFICULTY_LEVELS, TOTAL_QUESTIONS } from '../constants';
 import type { DifficultyLevel } from '../types';
 
 describe('DIFFICULTY_LEVELS', () => {
-  it('9段階のレベルが定義されている', () => {
-    expect(DIFFICULTY_LEVELS).toHaveLength(9);
+  it('13段階のレベルが定義されている', () => {
+    expect(DIFFICULTY_LEVELS).toHaveLength(13);
   });
 
   it('各レベルが必須フィールドをすべて持つ', () => {
@@ -59,15 +59,15 @@ describe('DIFFICULTY_LEVELS', () => {
     });
   });
 
-  it('先頭レベルは grade1（小学1年生）である', () => {
-    expect(DIFFICULTY_LEVELS[0].id).toBe('grade1');
+  it('先頭レベルは M（小学1年生）である', () => {
+    expect(DIFFICULTY_LEVELS[0].id).toBe('M');
     expect(DIFFICULTY_LEVELS[0].label).toBe('小学1年生');
   });
 
-  it('末尾レベルは university（大学生）である', () => {
+  it('末尾レベルは A（大学・一般）である', () => {
     const last = DIFFICULTY_LEVELS[DIFFICULTY_LEVELS.length - 1];
-    expect(last.id).toBe('university');
-    expect(last.label).toBe('大学生');
+    expect(last.id).toBe('A');
+    expect(last.label).toBe('大学・一般');
   });
 });
 
