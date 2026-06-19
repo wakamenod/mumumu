@@ -1,4 +1,3 @@
-import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../../lib/firebase';
 
 /** getQuizFunction へのリクエスト型 */
@@ -19,10 +18,7 @@ export interface GetQuizResponse {
   questions: QuizQuestion[];
 }
 
-const getQuizCallable = httpsCallable<GetQuizRequest, GetQuizResponse>(
-  functions,
-  'getQuizFunction'
-);
+const getQuizCallable = functions.httpsCallable<GetQuizRequest, GetQuizResponse>('getQuizFunction');
 
 /**
  * Cloud Functions の getQuizFunction を呼び出してクイズ一覧を取得する。

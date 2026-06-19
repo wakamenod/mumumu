@@ -1,41 +1,63 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
-import { initializeAppCheck, CustomProvider, getToken } from 'firebase/app-check';
+import firebase from '@react-native-firebase/app';
+import functionsModule from '@react-native-firebase/functions';
+import appCheckModule from '@react-native-firebase/app-check';
 
-const firebaseConfig = {
-  // ローカルエミュレーターは projectId のみ必須
-  projectId: 'mumumu-a278',
-  // 本番では apiKey, authDomain 等を設定する
-  apiKey: 'dummy-api-key',
-  appId: 'dummy-app-id',
-};
-
-// initializeApp を複数回呼ばないようにガード
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-
+// ─────────────────────────────────────────────────────────────────────────────
 // App Check の初期化
-// __DEV__: デバッグトークンを使用（エミュレーター側は enforceAppCheck: false のため実質不要だが、
-//          本番切り替え時に差し替えるだけで済むよう骨格を整えておく）
-// 本番:    CustomProvider を App Attest / Play Integrity プロバイダーに差し替える
-if (__DEV__) {
-  initializeAppCheck(app, {
-    provider: new CustomProvider({
-      getToken: () =>
-        Promise.resolve({
-          token: 'mumumu-debug-appcheck-token',
-          expireTimeMillis: Date.now() + 60 * 60 * 1000, // 1時間
-        }),
-    }),
+//
+// 【開発時（__DEV__ = true）= development ビルド / Expo Go】
+//   デバッグトークン（UUID）を使用する。
+//   Firebase Console > App Check > デバッグトークンを管理 で発行し、
+//   .env.local の EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN に設定する。
+//
+// 【本番・プレビュー時（__DEV__ = false）= preview / production ビルド】
+//   preview・production ともに正規の Apple/Google 署名が付いた実機ビルドなので
+//   ネイティブ証明書が使える。
+//   iOS: App Attest（Apple のデバイス証明。A12 Bionic 以降の実機のみ）
+//   Android: Play Integrity（Google のデバイス証明）
+//
+//   【事前に必要な設定】
+//   1. Apple Developer Console > Identifiers > com.wakamenod.mumumu
+//      > Capabilities > App Attest を ON
+//   2. Firebase Console > App Check > iOS アプリ > App Attest で登録
+//   3. Firebase Console > App Check > Android アプリ > Play Integrity で登録
+// ─────────────────────────────────────────────────────────────────────────────
+async function initializeAppCheck() {
+  const appCheck = appCheckModule();
+  const provider = appCheck.newReactNativeFirebaseAppCheckProvider();
+
+  provider.configure({
+    android: __DEV__
+      ? {
+          provider: 'debug',
+          debugToken: process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN,
+        }
+      : { provider: 'playIntegrity' },
+    apple: __DEV__
+      ? {
+          provider: 'debug',
+          debugToken: process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN,
+        }
+      : { provider: 'appAttest' },
+  });
+
+  await appCheck.initializeAppCheck({
+    provider,
     isTokenAutoRefreshEnabled: true,
   });
 }
 
-const functions = getFunctions(app, 'us-central1');
+initializeAppCheck().catch(console.error);
 
-// 開発中はローカルエミュレーターに接続する
+// ─────────────────────────────────────────────────────────────────────────────
+// Cloud Functions
+// ─────────────────────────────────────────────────────────────────────────────
+const functionsInstance = functionsModule();
+
+// 開発時はローカルエミュレーターに接続する
 if (__DEV__) {
-  connectFunctionsEmulator(functions, 'localhost', 5001);
+  functionsInstance.useEmulator('localhost', 5001);
 }
 
-export { functions };
-export { getToken };
+export { functionsInstance as functions };
+export { firebase };

@@ -72,24 +72,29 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 6. Firebase SDK のモック
-//    firebase パッケージは ESM 形式のため Jest (CommonJS) では
-//    そのままパースできない。テストでは実際の接続が不要なため
-//    必要な API をスタブに差し替える。
+// 6. @react-native-firebase のモック
+//    ネイティブモジュール（RNFBAppModule 等）は Jest (Node.js) 環境では
+//    存在しないため、必要な API をスタブに差し替える。
 // ─────────────────────────────────────────────────────────────
-jest.mock('firebase/app', () => ({
-  initializeApp: jest.fn(() => ({})),
-  getApps: jest.fn(() => []),
-}));
+const mockHttpsCallable = jest.fn(() =>
+  jest.fn(() => Promise.resolve({ data: { questions: [] } }))
+);
+const mockFunctionsInstance = {
+  httpsCallable: mockHttpsCallable,
+  useEmulator: jest.fn(),
+};
+jest.mock('@react-native-firebase/functions', () => jest.fn(() => mockFunctionsInstance));
 
-jest.mock('firebase/functions', () => ({
-  getFunctions: jest.fn(() => ({})),
-  connectFunctionsEmulator: jest.fn(),
-  httpsCallable: jest.fn(() => jest.fn(() => Promise.resolve({ data: { questions: [] } }))),
-}));
+const mockProvider = {
+  configure: jest.fn(),
+};
+const mockAppCheckInstance = {
+  newReactNativeFirebaseAppCheckProvider: jest.fn(() => mockProvider),
+  initializeAppCheck: jest.fn(() => Promise.resolve()),
+};
+jest.mock('@react-native-firebase/app-check', () => jest.fn(() => mockAppCheckInstance));
 
-jest.mock('firebase/app-check', () => ({
-  initializeAppCheck: jest.fn(),
-  CustomProvider: jest.fn(),
-  getToken: jest.fn(),
+jest.mock('@react-native-firebase/app', () => ({
+  __esModule: true,
+  default: {},
 }));

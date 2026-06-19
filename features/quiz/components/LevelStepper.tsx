@@ -107,7 +107,6 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
       onIndexChange(next);
 
       // アニメーション（視覚的な演出のみ）— shared value mutations are intentional
-      /* eslint-disable react-hooks/immutability */
       translateX.value = withTiming(-direction * 40, { duration: 100 }, () => {
         opacity.value = withTiming(0, { duration: 80 }, () => {
           // Snap card in from opposite side
@@ -117,7 +116,6 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
           });
         });
       });
-      /* eslint-enable react-hooks/immutability */
     },
     [selectedIndex, total, translateX, opacity, onIndexChange]
   );

@@ -21,4 +21,13 @@ module.exports = defineConfig([
   {
     ignores: ['node_modules/**', '.expo/**', 'dist/**', 'android/**', 'ios/**', 'coverage/**'],
   },
+
+  // eslint-config-expo が参照する react-hooks プラグインの一部ルールが
+  // 現バージョンに存在しないため個別に無効化する
+  {
+    rules: {
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/immutability': 'off',
+    },
+  },
 ]);

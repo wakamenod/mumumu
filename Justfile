@@ -30,32 +30,40 @@ web:
     npx expo start --web
 
 # ───────────────────────────────────────────
+# デバイス登録
+# ───────────────────────────────────────────
+
+# デバイス登録 (EAS)
+device:
+    npx eas-cli device:create
+
+# ───────────────────────────────────────────
 # ビルド (EAS Build)
 # ───────────────────────────────────────────
 
 # iOS 向け開発ビルド (EAS)
 build-ios-dev:
-    npx eas build --profile development --platform ios
+    npx eas-cli build --profile development --platform ios
 
 # Android 向け開発ビルド (EAS)
 build-android-dev:
-    npx eas build --profile development --platform android
+    npx eas-cli build --profile development --platform android
 
 # iOS 向けプレビュービルド (EAS)
 build-ios-preview:
-    npx eas build --profile preview --platform ios
+    npx eas-cli build --profile preview --platform ios
 
 # Android 向けプレビュービルド (EAS)
 build-android-preview:
-    npx eas build --profile preview --platform android
+    npx eas-cli build --profile preview --platform android
 
 # iOS 向けプロダクションビルド (EAS)
 build-ios:
-    npx eas build --profile production --platform ios
+    npx eas-cli build --profile production --platform ios
 
 # Android 向けプロダクションビルド (EAS)
 build-android:
-    npx eas build --profile production --platform android
+    npx eas-cli build --profile production --platform android
 
 # ───────────────────────────────────────────
 # 型チェック / Lint
