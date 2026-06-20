@@ -83,9 +83,19 @@ function setupLoadingResponse() {
   );
 }
 
-/** エラーを返すよう callable を設定する */
-function setupErrorResponse() {
-  callable.mockRejectedValue(new Error('ネットワークエラー'));
+/** Error インスタンスを throw するよう callable を設定する */
+function setupErrorResponse(message = 'ネットワークエラー') {
+  callable.mockRejectedValue(new Error(message));
+}
+
+/** Error インスタンス以外（文字列など）を throw するよう callable を設定する */
+function setupNonErrorResponse() {
+  callable.mockRejectedValue('something went wrong');
+}
+
+/** 空の問題リストを返すよう callable を設定する */
+function setupEmptyResponse() {
+  callable.mockResolvedValue({ data: { questions: [] } });
 }
 
 /**
@@ -230,6 +240,156 @@ describe('QuizScreen — NumericKeypad との統合', () => {
 
       expect(screen.queryByTestId('numeric-keypad-display')).toBeNull();
       expect(screen.queryByText('【解答ルール】')).toBeNull();
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  describe('ナビゲーションボタンの disabled 状態', () => {
+    it('最初の問題では「前へ」を押しても問題番号が変わらない', async () => {
+      await renderQuizScreen();
+
+      // currentIndex=0（問 1 / 3）の状態で「前へ」を押す
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('前の問題'));
+      });
+
+      // 問題番号が変化していない（nav row のカウンター）
+      expect(screen.getByText('1 / 3')).toBeTruthy();
+    });
+
+    it('最後の問題では「次へ」を押しても問題番号が変わらない', async () => {
+      await renderQuizScreen();
+
+      // 最後の問題（index 2）まで進む
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('次の問題'));
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('次の問題'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('3 / 3')).toBeTruthy();
+      });
+
+      // 最後の問題で「次へ」を押す
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('次の問題'));
+      });
+
+      // 問題番号が変化していない
+      expect(screen.getByText('3 / 3')).toBeTruthy();
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  describe('エラーメッセージの詳細表示', () => {
+    it('Error インスタンスを throw したとき、そのメッセージが画面に表示される', async () => {
+      setupErrorResponse('サーバーに接続できません');
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('サーバーに接続できません')).toBeTruthy();
+      });
+    });
+
+    it('Error インスタンス以外を throw したとき「不明なエラーが発生しました」が表示される', async () => {
+      setupNonErrorResponse();
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('不明なエラーが発生しました')).toBeTruthy();
+      });
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  describe('空の問題リスト', () => {
+    it('questions: [] のとき NumericKeypad が表示されない', async () => {
+      setupEmptyResponse();
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      // success 状態になる（エラーでもローディングでもない）が、
+      // currentQuestion が undefined のため問題エリアが描画されない
+      await waitFor(() => {
+        expect(screen.queryByText('クイズを取得中...')).toBeNull();
+      });
+
+      expect(screen.queryByTestId('numeric-keypad-display')).toBeNull();
+    });
+
+    it('questions: [] のときナビゲーションボタン行が表示されない', async () => {
+      setupEmptyResponse();
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('クイズを取得中...')).toBeNull();
+      });
+
+      // totalCount === 0 のときはナビ行ごと非表示になる
+      expect(screen.queryByLabelText('次の問題')).toBeNull();
+      expect(screen.queryByLabelText('前の問題')).toBeNull();
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  describe('未知の levelId のフォールバック表示', () => {
+    it('DIFFICULTY_LEVELS に存在しない levelId のとき、ヘッダーに levelId がそのまま表示される', async () => {
+      // 'Z' は DIFFICULTY_LEVELS に存在しない ID
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'Z' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      // level が見つからない場合は levelId 文字列をそのまま badge に表示する
+      await waitFor(() => {
+        expect(screen.getByText('Z')).toBeTruthy();
+      });
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  describe('levelId が未指定のエラー', () => {
+    it('levelId がない場合にエラータイトルが表示される', async () => {
+      // useLocalSearchParams が levelId を持たないオブジェクトを返す
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('エラーが発生しました')).toBeTruthy();
+      });
+    });
+
+    it('levelId がない場合に専用のエラーメッセージが表示される', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('levelId が指定されていません')).toBeTruthy();
+      });
     });
   });
 });
