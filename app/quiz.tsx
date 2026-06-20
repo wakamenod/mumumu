@@ -1,22 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useColorScheme,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
 import Colors from '@/constants/Colors';
-import { DIFFICULTY_LEVELS, getQuiz } from '@/features/quiz';
+import { DIFFICULTY_LEVELS, MathDisplay, getQuiz } from '@/features/quiz';
 import type { GetQuizResponse } from '@/features/quiz';
+
+// ─── 型定義 ──────────────────────────────────────────────────────────────────
 
 type FetchState =
   | { status: 'loading' }
   | { status: 'success'; data: GetQuizResponse }
   | { status: 'error'; message: string };
+
+// ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function QuizScreen() {
   const { levelId } = useLocalSearchParams<{ levelId: string }>();
@@ -26,6 +23,7 @@ export default function QuizScreen() {
   const level = DIFFICULTY_LEVELS.find((l) => l.id === levelId);
 
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'loading' });
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,12 +36,14 @@ export default function QuizScreen() {
         return;
       }
 
-      // ここは非同期関数内なので同期 setState の警告が出ない
       if (!cancelled) setFetchState({ status: 'loading' });
 
       try {
         const data = await getQuiz([levelId]);
-        if (!cancelled) setFetchState({ status: 'success', data });
+        if (!cancelled) {
+          setFetchState({ status: 'success', data });
+          setCurrentIndex(0);
+        }
       } catch (err: unknown) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
@@ -54,27 +54,54 @@ export default function QuizScreen() {
 
     fetchQuiz();
 
-    // levelId が変わった場合に古い結果で state を上書きしない
     return () => {
       cancelled = true;
     };
   }, [levelId]);
 
+  // 成功時のみ使う派生値
+  const questions = fetchState.status === 'success' ? fetchState.data.questions : [];
+  const totalCount = questions.length;
+  const currentQuestion = questions[currentIndex];
+  const isLastQuestion = currentIndex === totalCount - 1;
+
+  const handleNext = () => {
+    if (!isLastQuestion) {
+      setCurrentIndex((prev) => prev + 1);
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex((prev) => prev - 1);
+    }
+  };
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
   return (
     <View style={[styles.container, { backgroundColor: colors.screenBackground }]}>
-      {/* ヘッダー */}
+      {/* ─ ヘッダー ─ */}
       <View style={styles.header}>
         <Text style={[styles.badge, { color: level?.color ?? colors.accent }]}>
           {level?.label ?? levelId ?? '不明'}
         </Text>
-        <Text style={[styles.title, { color: colors.levelLabel }]}>クイズ回答画面</Text>
-        <Text style={[styles.sub, { color: colors.levelDescription }]}>
-          疎通確認 — getQuizFunction レスポンス
-        </Text>
+
+        {fetchState.status === 'success' && (
+          <Text style={[styles.progress, { color: colors.levelDescription }]}>
+            問 {currentIndex + 1} / {totalCount}
+          </Text>
+        )}
       </View>
 
-      {/* レスポンス表示エリア */}
-      <View style={[styles.responseBox, { borderColor: level?.color ?? colors.accent }]}>
+      {/* ─ メインエリア ─ */}
+      <View
+        style={[
+          styles.mainArea,
+          { borderColor: level?.color ?? colors.accent, backgroundColor: colors.cardBackground },
+        ]}
+      >
+        {/* ローディング */}
         {fetchState.status === 'loading' && (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={level?.color ?? colors.accent} />
@@ -84,6 +111,7 @@ export default function QuizScreen() {
           </View>
         )}
 
+        {/* エラー */}
         {fetchState.status === 'error' && (
           <View style={styles.centered}>
             <Text style={styles.errorIcon}>❌</Text>
@@ -96,20 +124,62 @@ export default function QuizScreen() {
           </View>
         )}
 
-        {fetchState.status === 'success' && (
-          <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-            <Text style={[styles.successLabel, { color: level?.color ?? colors.accent }]}>
-              ✅ 取得成功 — {fetchState.data.questions.length} 問
-            </Text>
-            <Text style={[styles.jsonText, { color: colors.levelLabel }]} selectable>
-              {JSON.stringify(fetchState.data, null, 2)}
-            </Text>
-          </ScrollView>
+        {/* 問題表示 */}
+        {fetchState.status === 'success' && currentQuestion && (
+          <View style={styles.questionArea}>
+            <MathDisplay latex={currentQuestion.question} />
+          </View>
         )}
       </View>
+
+      {/* ─ ナビゲーションボタン（確認用） ─ */}
+      {fetchState.status === 'success' && (
+        <View style={styles.navRow}>
+          {/* 前へ */}
+          <Pressable
+            style={[
+              styles.navButton,
+              { backgroundColor: colors.accent },
+              currentIndex === 0 && styles.navButtonDisabled,
+            ]}
+            onPress={handlePrev}
+            disabled={currentIndex === 0}
+            accessibilityLabel="前の問題"
+          >
+            <Text
+              style={[styles.navButtonText, currentIndex === 0 && styles.navButtonTextDisabled]}
+            >
+              ← 前へ
+            </Text>
+          </Pressable>
+
+          {/* 問題番号ドット */}
+          <Text style={[styles.indexLabel, { color: colors.levelDescription }]}>
+            {currentIndex + 1} / {totalCount}
+          </Text>
+
+          {/* 次へ */}
+          <Pressable
+            style={[
+              styles.navButton,
+              { backgroundColor: colors.accent },
+              isLastQuestion && styles.navButtonDisabled,
+            ]}
+            onPress={handleNext}
+            disabled={isLastQuestion}
+            accessibilityLabel="次の問題"
+          >
+            <Text style={[styles.navButtonText, isLastQuestion && styles.navButtonTextDisabled]}>
+              次へ →
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
+
+// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -118,27 +188,29 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     gap: 20,
   },
+
+  // ヘッダー
   header: {
     alignItems: 'center',
     gap: 6,
   },
   badge: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
+  progress: {
+    fontSize: 14,
+    fontWeight: '600',
   },
-  sub: {
-    fontSize: 13,
-  },
-  responseBox: {
+
+  // 問題カード
+  mainArea: {
     flex: 1,
     borderWidth: 1.5,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
+    justifyContent: 'center',
   },
   centered: {
     flex: 1,
@@ -161,21 +233,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
   },
-  scrollView: {
+  questionArea: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
-  scrollContent: {
-    padding: 16,
-    gap: 12,
+
+  // ナビゲーション行
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
   },
-  successLabel: {
-    fontSize: 14,
+  navButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+  },
+  navButtonDisabled: {
+    opacity: 0.3,
+  },
+  navButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 8,
   },
-  jsonText: {
-    fontFamily: 'SpaceMono',
-    fontSize: 11,
-    lineHeight: 18,
+  navButtonTextDisabled: {
+    color: '#FFFFFF',
+  },
+  indexLabel: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

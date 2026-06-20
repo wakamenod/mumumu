@@ -17,13 +17,13 @@ start:
 start-clean:
     npx expo start --clear
 
-# iOS シミュレーターで起動
+# iOS シミュレーターで起動（ネイティブビルド＋インストール＋Metro 起動）
 ios:
-    npx expo start --ios
+    npx expo run:ios
 
-# Android エミュレーターで起動
+# Android エミュレーターで起動（ネイティブビルド＋インストール＋Metro 起動）
 android:
-    npx expo start --android
+    npx expo run:android
 
 # Web ブラウザで起動
 web:

@@ -40,6 +40,8 @@ google-services.json
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
+# generated native folders (Podfile のみ追跡)
+# /ios 全体ではなく /ios/* にすることで !/ios/Podfile の例外指定が有効になる
+/ios/*
+!/ios/Podfile
 /android
