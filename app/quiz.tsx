@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } 
 import { useLocalSearchParams } from 'expo-router';
 
 import Colors from '@/constants/Colors';
-import { DIFFICULTY_LEVELS, MathDisplay, getQuiz } from '@/features/quiz';
+import { DIFFICULTY_LEVELS, MathDisplay, NumericKeypad, getQuiz } from '@/features/quiz';
 import type { GetQuizResponse } from '@/features/quiz';
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
@@ -24,6 +24,9 @@ export default function QuizScreen() {
 
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'loading' });
   const [currentIndex, setCurrentIndex] = useState(0);
+  // 入力値。送信ボタン実装時に使用する
+  const [inputRaw, setInputRaw] = useState('');
+  void inputRaw; // TODO: 送信ボタン実装時に削除する
 
   useEffect(() => {
     let cancelled = false;
@@ -68,12 +71,14 @@ export default function QuizScreen() {
   const handleNext = () => {
     if (!isLastQuestion) {
       setCurrentIndex((prev) => prev + 1);
+      setInputRaw('');
     }
   };
 
   const handlePrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
+      setInputRaw('');
     }
   };
 
@@ -124,10 +129,13 @@ export default function QuizScreen() {
           </View>
         )}
 
-        {/* 問題表示 */}
+        {/* 問題表示 + 入力エリア */}
         {fetchState.status === 'success' && currentQuestion && (
           <View style={styles.questionArea}>
-            <MathDisplay latex={currentQuestion.question} />
+            <View style={styles.mathWrapper}>
+              <MathDisplay latex={currentQuestion.question} />
+            </View>
+            <NumericKeypad key={currentIndex} onValueChange={setInputRaw} />
           </View>
         )}
       </View>
@@ -236,8 +244,14 @@ const styles = StyleSheet.create({
   questionArea: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    justifyContent: 'flex-start',
+    padding: 16,
+    gap: 16,
+  },
+  mathWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 12,
   },
 
   // ナビゲーション行

@@ -98,3 +98,19 @@ jest.mock('@react-native-firebase/app', () => ({
   __esModule: true,
   default: {},
 }));
+
+// ─────────────────────────────────────────────────────────────
+// 7. lib/firebase のモック
+//    lib/firebase.ts は import 時に initializeAppCheck() を実行し、
+//    その非同期処理が Jest ワーカーに残留して open handle 警告を引き起こす。
+//    グローバルモックとして差し替えることで非同期処理の残留を防ぐ。
+//    ※ QuizScreen.test.tsx など個別テストで上書きする場合は
+//       各ファイル内で jest.mock('@/lib/firebase', ...) を再定義する。
+// ─────────────────────────────────────────────────────────────
+jest.mock('@/lib/firebase', () => ({
+  functions: {
+    httpsCallable: jest.fn(() => jest.fn(() => Promise.resolve({ data: { questions: [] } }))),
+    useEmulator: jest.fn(),
+  },
+  firebase: {},
+}));
