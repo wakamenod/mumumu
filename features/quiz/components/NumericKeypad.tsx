@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 import Colors from '@/constants/Colors';
 
@@ -10,17 +17,42 @@ type Sign = '+' | '-';
 type Props = {
   /** 入力値が変化するたびに呼ばれる。raw 文字列（例: "-2/5", "3", "0"）を渡す */
   onValueChange: (raw: string) => void;
+  /** 回答結果。true=正解(○), false=不正解(×), null/undefined=未回答（非表示） */
+  resultState?: boolean | null;
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function NumericKeypad({ onValueChange }: Props) {
+export function NumericKeypad({ onValueChange, resultState }: Props) {
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];
 
   const [sign, setSign] = useState<Sign>('+');
   // 数字とスラッシュのみを保持する文字列（符号なし）
   const [digits, setDigits] = useState('');
+
+  // ─── ○× オーバーレイ アニメーション ────────────────────────────────────
+  const markOpacity = useSharedValue(0);
+  const markScale = useSharedValue(0.4);
+
+  useEffect(() => {
+    if (resultState === true || resultState === false) {
+      // マウント直後またはフラグ変化時にアニメーションを再生
+      markOpacity.value = 0;
+      markScale.value = 0.4;
+      markOpacity.value = withTiming(1, { duration: 200 });
+      markScale.value = withSequence(
+        withSpring(1.25, { damping: 6, stiffness: 200 }),
+        withSpring(1.0, { damping: 10, stiffness: 180 })
+      );
+    }
+    // null/undefined のときは条件付きレンダリングでアンマウントされるため何もしない
+  }, [resultState, markOpacity, markScale]);
+
+  const markAnimStyle = useAnimatedStyle(() => ({
+    opacity: markOpacity.value,
+    transform: [{ scale: markScale.value }],
+  }));
 
   // ─── 表示・送出値の導出 ─────────────────────────────────────────────────
   const rawValue = useMemo(() => {
@@ -198,6 +230,21 @@ export function NumericKeypad({ onValueChange }: Props) {
         >
           {displayText}
         </Text>
+
+        {/* ○× オーバーレイ（入力表示エリア全体に重なる）
+            resultState が null/undefined のときはアンマウントして完全に非表示にする */}
+        {(resultState === true || resultState === false) && (
+          <Animated.View style={[styles.resultOverlay, markAnimStyle]} pointerEvents="none">
+            <Text
+              style={[
+                styles.resultMark,
+                resultState ? styles.resultMarkCorrect : styles.resultMarkWrong,
+              ]}
+            >
+              {resultState ? '○' : '×'}
+            </Text>
+          </Animated.View>
+        )}
       </View>
 
       {/* ─ 解答ルール文言（§4.3） ─ */}
@@ -250,6 +297,28 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     letterSpacing: 1,
+  },
+
+  // ○× オーバーレイ（display View に絶対配置で重なる）
+  resultOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultMark: {
+    fontSize: 48,
+    fontWeight: '900',
+    lineHeight: 56,
+  },
+  resultMarkCorrect: {
+    color: '#E02020',
+  },
+  resultMarkWrong: {
+    color: '#555555',
   },
 
   // 解答ルール

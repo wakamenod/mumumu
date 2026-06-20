@@ -43,11 +43,12 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 #+BEGIN_SRC text
 / (プロジェクトルート)
 ├── app/                    # Expo Router ファイルベースルーティング
-│   ├── _layout.tsx         # ルートスタック設定
+│   ├── _layout.tsx         # ルートスタック設定（quiz / result ルートを登録）
 │   ├── (tabs)/             # タブグループ
 │   │   ├── _layout.tsx
 │   │   └── index.tsx       # 難易度選択画面（初期画面）
-│   └── quiz.tsx            # クイズ画面
+│   ├── quiz.tsx            # クイズ画面
+│   └── result.tsx          # 結果画面（correct・total パラメータを受け取る）
 ├── assets/                 # 画像・フォントなど
 ├── components/             # アプリ全体で共通のUI（Themed.tsx など）
 ├── constants/              # カラートークンなどのアプリ定数
@@ -56,7 +57,8 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │       ├── __tests__/      # クイズ機能のテスト群
 │       ├── components/     # クイズ機能固有のUIコンポーネント
 │       │   ├── LevelStepper.tsx
-│       │   └── MathDisplay.tsx   # LaTeX 数式レンダリング
+│       │   ├── MathDisplay.tsx     # LaTeX 数式レンダリング
+│       │   └── NumericKeypad.tsx   # カスタム数値キーパッド（正誤オーバーレイ内蔵）
 │       ├── types.ts        # 型定義（DifficultyLevel など）
 │       ├── constants.ts    # ドメイン定数（DIFFICULTY_LEVELS など）
 │       └── index.ts        # 外部に公開するインターフェース
@@ -81,6 +83,7 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 | グローバル状態管理   | Zustand                                                  |
 | ディレクトリ設計     | Featuresベース + Hooksによるロジック分離                  |
 | アニメーション       | react-native-reanimated v4 (useSharedValue + withSpring) |
+| ハッシュ演算         | expo-crypto (Crypto.digestStringAsync / SHA-256)         |
 | LaTeX レンダリング   | react-native-mathjax-html-to-svg + react-native-svg     |
 | テスト               | Jest + @testing-library/react-native v14                 |
 

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import * as Crypto from 'expo-crypto';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
 
 import Colors from '@/constants/Colors';
 import { DIFFICULTY_LEVELS, MathDisplay, NumericKeypad, getQuiz } from '@/features/quiz';
@@ -22,11 +23,13 @@ export default function QuizScreen() {
 
   const level = DIFFICULTY_LEVELS.find((l) => l.id === levelId);
 
+  const router = useRouter();
+
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'loading' });
   const [currentIndex, setCurrentIndex] = useState(0);
-  // 入力値。送信ボタン実装時に使用する
   const [inputRaw, setInputRaw] = useState('');
-  void inputRaw; // TODO: 送信ボタン実装時に削除する
+  // 各問の正誤 (true=正解, false=不正解, null=未回答)
+  const [results, setResults] = useState<(boolean | null)[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,19 +71,29 @@ export default function QuizScreen() {
   const currentQuestion = questions[currentIndex];
   const isLastQuestion = currentIndex === totalCount - 1;
 
-  const handleNext = () => {
-    if (!isLastQuestion) {
-      setCurrentIndex((prev) => prev + 1);
-      setInputRaw('');
-    }
-  };
+  const handleSubmit = useCallback(async () => {
+    if (!currentQuestion) return;
 
-  const handlePrev = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
-      setInputRaw('');
-    }
-  };
+    // SHA-256 ハッシュを計算して比較（仕様 §5.2: 生文字列をそのままハッシュ化）
+    const hash = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, inputRaw);
+    const isCorrect = hash === currentQuestion.answer_hash;
+
+    // 結果を保存
+    const nextResults = [...results];
+    nextResults[currentIndex] = isCorrect;
+    setResults(nextResults);
+
+    // 短いディレイの後、次の問題へ（最終問題なら結果画面へ）
+    setTimeout(() => {
+      const correctCount = nextResults.filter((r) => r === true).length;
+      if (isLastQuestion) {
+        router.push(`/result?correct=${correctCount}&total=${totalCount}`);
+      } else {
+        setCurrentIndex((prev) => prev + 1);
+        setInputRaw('');
+      }
+    }, 900);
+  }, [currentQuestion, inputRaw, currentIndex, results, isLastQuestion, totalCount, router]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -135,50 +148,26 @@ export default function QuizScreen() {
             <View style={styles.mathWrapper}>
               <MathDisplay latex={currentQuestion.question} />
             </View>
-            <NumericKeypad key={currentIndex} onValueChange={setInputRaw} />
+
+            <NumericKeypad
+              key={currentIndex}
+              onValueChange={setInputRaw}
+              resultState={results[currentIndex] ?? null}
+            />
           </View>
         )}
       </View>
 
-      {/* ─ ナビゲーションボタン（確認用） ─ */}
+      {/* ─ 回答ボタン ─ */}
       {fetchState.status === 'success' && totalCount > 0 && (
         <View style={styles.navRow}>
-          {/* 前へ */}
           <Pressable
-            style={[
-              styles.navButton,
-              { backgroundColor: colors.accent },
-              currentIndex === 0 && styles.navButtonDisabled,
-            ]}
-            onPress={handlePrev}
-            disabled={currentIndex === 0}
-            accessibilityLabel="前の問題"
+            style={[styles.submitButton, { backgroundColor: level?.color ?? colors.accent }]}
+            onPress={handleSubmit}
+            accessibilityLabel={isLastQuestion ? '回答して結果を見る' : '回答する'}
           >
-            <Text
-              style={[styles.navButtonText, currentIndex === 0 && styles.navButtonTextDisabled]}
-            >
-              ← 前へ
-            </Text>
-          </Pressable>
-
-          {/* 問題番号ドット */}
-          <Text style={[styles.indexLabel, { color: colors.levelDescription }]}>
-            {currentIndex + 1} / {totalCount}
-          </Text>
-
-          {/* 次へ */}
-          <Pressable
-            style={[
-              styles.navButton,
-              { backgroundColor: colors.accent },
-              isLastQuestion && styles.navButtonDisabled,
-            ]}
-            onPress={handleNext}
-            disabled={isLastQuestion}
-            accessibilityLabel="次の問題"
-          >
-            <Text style={[styles.navButtonText, isLastQuestion && styles.navButtonTextDisabled]}>
-              次へ →
+            <Text style={styles.submitButtonText}>
+              {isLastQuestion ? '回答して結果へ' : '回答'}
             </Text>
           </Pressable>
         </View>
@@ -254,31 +243,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
 
-  // ナビゲーション行
+  // 回答ボタン行
   navRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 4,
   },
-  navButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
+  submitButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
   },
-  navButtonDisabled: {
-    opacity: 0.3,
-  },
-  navButtonText: {
+  submitButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  navButtonTextDisabled: {
-    color: '#FFFFFF',
-  },
-  indexLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

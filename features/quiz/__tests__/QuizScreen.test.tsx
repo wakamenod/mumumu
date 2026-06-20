@@ -34,6 +34,12 @@ jest.mock('@/lib/firebase', () => {
   };
 });
 
+// expo-crypto をモック（SHA-256 ハッシュを固定値で返す）
+jest.mock('expo-crypto', () => ({
+  CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
+  digestStringAsync: jest.fn().mockResolvedValue('mock-hash-never-matches'),
+}));
+
 // ─── 通常の import ────────────────────────────────────────────
 // jest.mock の hoisting により、下記 import は実行順序上 jest.mock より後になる。
 // import/first ルールの警告を抑制する。
@@ -41,9 +47,13 @@ jest.mock('@/lib/firebase', () => {
 import React from 'react';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
 import { useLocalSearchParams } from 'expo-router';
+import * as ExpoCrypto from 'expo-crypto';
 
 import QuizScreen from '@/app/quiz';
 /* eslint-enable import/first */
+
+// expo-crypto の digestStringAsync mock への参照（テストごとに挙動を差し替える）
+const mockDigestStringAsync = ExpoCrypto.digestStringAsync as jest.Mock;
 
 // ─── モックの callable を取得 ─────────────────────────────────
 // jest.mock のファクトリーで作成した callable を __callable 経由で取得する。
@@ -149,7 +159,8 @@ describe('QuizScreen — NumericKeypad との統合', () => {
 
   // ────────────────────────────────────────────────────────────
   describe('問題切り替え時の入力リセット', () => {
-    it('数字を入力後に "次へ" を押すと入力が "?" にリセットされる', async () => {
+    it('数字を入力後に "回答" を押すと次問に進み入力が "?" にリセットされる', async () => {
+      jest.useFakeTimers();
       await renderQuizScreen();
 
       // 数字を入力する
@@ -158,45 +169,23 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       });
       expect(screen.getByTestId('numeric-keypad-display').props.children).toBe('5');
 
-      // 「次へ」を押す
+      // 「回答」を押す（SHA-256 は mock-hash-never-matches を返すため不正解になる）
       await act(async () => {
-        fireEvent.press(screen.getByLabelText('次の問題'));
+        fireEvent.press(screen.getByLabelText('回答する'));
       });
 
-      // 入力がリセットされて "?" に戻る
-      await waitFor(() => {
-        expect(screen.getByTestId('numeric-keypad-display').props.children).toBe('?');
-      });
-    });
-
-    it('"次へ" で移動してから入力し "前へ" で戻ると入力がリセットされる', async () => {
-      await renderQuizScreen();
-
-      // 1問目から次へ
+      // 900ms 後に次問へ進む setTimeout を進める
       await act(async () => {
-        fireEvent.press(screen.getByLabelText('次の問題'));
+        jest.advanceTimersByTime(1000);
       });
 
-      // 2問目に遷移したことをページ番号で確認（MathDisplay はSVG描画のためテキスト検索不可）
+      // 2問目に遷移し入力がリセットされて "?" に戻る
       await waitFor(() => {
         expect(screen.getByText('問 2 / 3')).toBeTruthy();
-      });
-
-      // 2問目で入力
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('9'));
-      });
-      expect(screen.getByTestId('numeric-keypad-display').props.children).toBe('9');
-
-      // 前へ戻る
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('前の問題'));
-      });
-
-      // 1問目に戻り、入力がリセットされている
-      await waitFor(() => {
         expect(screen.getByTestId('numeric-keypad-display').props.children).toBe('?');
       });
+
+      jest.useRealTimers();
     });
   });
 
@@ -244,41 +233,33 @@ describe('QuizScreen — NumericKeypad との統合', () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  describe('ナビゲーションボタンの disabled 状態', () => {
-    it('最初の問題では「前へ」を押しても問題番号が変わらない', async () => {
+  describe('回答ボタンの表示', () => {
+    it('クイズ読み込み後に「回答する」ボタンが表示される', async () => {
       await renderQuizScreen();
-
-      // currentIndex=0（問 1 / 3）の状態で「前へ」を押す
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('前の問題'));
-      });
-
-      // 問題番号が変化していない（nav row のカウンター）
-      expect(screen.getByText('1 / 3')).toBeTruthy();
+      expect(screen.getByLabelText('回答する')).toBeTruthy();
     });
 
-    it('最後の問題では「次へ」を押しても問題番号が変わらない', async () => {
+    it('最後の問題では「回答して結果を見る」ラベルになる', async () => {
+      jest.useFakeTimers();
       await renderQuizScreen();
 
-      // 最後の問題（index 2）まで進む
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('次の問題'));
-      });
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('次の問題'));
-      });
+      // 最後の問題（index 2）まで回答で進む
+      for (let i = 0; i < 2; i++) {
+        await act(async () => {
+          fireEvent.press(screen.getByLabelText('回答する'));
+        });
+        await act(async () => {
+          jest.advanceTimersByTime(1000);
+        });
+        await waitFor(() => {
+          expect(screen.getByText(`問 ${i + 2} / 3`)).toBeTruthy();
+        });
+      }
 
-      await waitFor(() => {
-        expect(screen.getByText('3 / 3')).toBeTruthy();
-      });
+      // 最後の問題ではラベルが変わる
+      expect(screen.getByLabelText('回答して結果を見る')).toBeTruthy();
 
-      // 最後の問題で「次へ」を押す
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('次の問題'));
-      });
-
-      // 問題番号が変化していない
-      expect(screen.getByText('3 / 3')).toBeTruthy();
+      jest.useRealTimers();
     });
   });
 
@@ -330,7 +311,7 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       expect(screen.queryByTestId('numeric-keypad-display')).toBeNull();
     });
 
-    it('questions: [] のときナビゲーションボタン行が表示されない', async () => {
+    it('questions: [] のとき回答ボタン行が表示されない', async () => {
       setupEmptyResponse();
       (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
 
@@ -342,9 +323,9 @@ describe('QuizScreen — NumericKeypad との統合', () => {
         expect(screen.queryByText('クイズを取得中...')).toBeNull();
       });
 
-      // totalCount === 0 のときはナビ行ごと非表示になる
-      expect(screen.queryByLabelText('次の問題')).toBeNull();
-      expect(screen.queryByLabelText('前の問題')).toBeNull();
+      // totalCount === 0 のときはボタン行ごと非表示になる
+      expect(screen.queryByLabelText('回答する')).toBeNull();
+      expect(screen.queryByLabelText('回答して結果を見る')).toBeNull();
     });
   });
 
@@ -390,6 +371,91 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       await waitFor(() => {
         expect(screen.getByText('levelId が指定されていません')).toBeTruthy();
       });
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  describe('正誤オーバーレイ（resultState の伝播）', () => {
+    /**
+     * テスト方針:
+     *   - QuizScreen が回答後に NumericKeypad の resultState prop を更新し、
+     *     入力表示エリア内に ○/× が描画されることを結合テストで確認する。
+     *   - SHA-256 比較は expo-crypto をモックで制御する。
+     *     - 不正解: mockDigestStringAsync が 'mock-hash-never-matches' を返す（デフォルト）
+     *     - 正解:   mockDigestStringAsync が MOCK_QUESTIONS[0].answer_hash と同じ値を返す
+     *   - setTimeout (900ms) は jest.useFakeTimers() で制御し、
+     *     タイマー進行前（○/× 表示中）と進行後（次問へ遷移後）を分けて検証する。
+     */
+
+    beforeEach(() => {
+      // デフォルトに戻す（不正解になるハッシュ）
+      mockDigestStringAsync.mockResolvedValue('mock-hash-never-matches');
+    });
+
+    it('回答後（タイマー進行前）に × が表示される（不正解の場合）', async () => {
+      jest.useFakeTimers();
+      await renderQuizScreen();
+
+      // 回答ボタンを押す（digestStringAsync はデフォルトで不一致を返す → 不正解）
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('回答する'));
+      });
+
+      // タイマーを進める前の時点で × が表示されている
+      expect(screen.getByText('×')).toBeTruthy();
+      expect(screen.queryByText('○')).toBeNull();
+
+      // タイマーを進めてクリーンアップ
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+      jest.useRealTimers();
+    });
+
+    it('回答後（タイマー進行前）に ○ が表示される（正解の場合）', async () => {
+      // 1問目の answer_hash と同じ値をモックが返す → 正解
+      mockDigestStringAsync.mockResolvedValue(MOCK_QUESTIONS[0].answer_hash);
+
+      jest.useFakeTimers();
+      await renderQuizScreen();
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('回答する'));
+      });
+
+      // ○ が表示されている
+      expect(screen.getByText('○')).toBeTruthy();
+      expect(screen.queryByText('×')).toBeNull();
+
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+      jest.useRealTimers();
+    });
+
+    it('次の問題に進むと ○/× が消えて入力待ち状態に戻る', async () => {
+      jest.useFakeTimers();
+      await renderQuizScreen();
+
+      // 1問目に回答（不正解）
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('回答する'));
+      });
+      expect(screen.getByText('×')).toBeTruthy();
+
+      // 900ms 後に次問へ自動遷移
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      // 2問目に遷移し、2問目は未回答なので ○/× が消えている
+      await waitFor(() => {
+        expect(screen.getByText('問 2 / 3')).toBeTruthy();
+      });
+      expect(screen.queryByText('×')).toBeNull();
+      expect(screen.queryByText('○')).toBeNull();
+
+      jest.useRealTimers();
     });
   });
 });

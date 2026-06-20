@@ -325,4 +325,68 @@ describe('NumericKeypad', () => {
       expect(screen.getByText(/既約分数（これ以上約分できない状態）にしてください/)).toBeTruthy();
     });
   });
+
+  // ────────────────────────────────────────────────────────────
+  describe('resultState prop — 正誤オーバーレイ', () => {
+    /**
+     * テスト方針:
+     *   - resultState が true/false のとき、入力表示エリア内に ○/× の Text が存在する。
+     *   - resultState が undefined（デフォルト）のとき ○/× は DOM に存在しない。
+     *   - ○/× の Text は pointerEvents="none" の Animated.View の内側にあるため
+     *     getByText で直接取得できる。
+     *   - アニメーション（withSpring 等）は jest.setup.ts でモック済みのため
+     *     opacity/scale の変化は検証せず、DOM への出現・消滅のみを検証する。
+     */
+
+    async function renderKeypadWithResult(resultState?: boolean | null) {
+      await act(async () => {
+        render(<NumericKeypad onValueChange={jest.fn()} resultState={resultState} />);
+      });
+    }
+
+    it('resultState を渡さないとき ○ も × も表示されない', async () => {
+      await renderKeypadWithResult();
+      expect(screen.queryByText('○')).toBeNull();
+      expect(screen.queryByText('×')).toBeNull();
+    });
+
+    it('resultState={null} のとき ○ も × も表示されない', async () => {
+      await renderKeypadWithResult(null);
+      expect(screen.queryByText('○')).toBeNull();
+      expect(screen.queryByText('×')).toBeNull();
+    });
+
+    it('resultState={true} のとき ○ が表示される', async () => {
+      await renderKeypadWithResult(true);
+      expect(screen.getByText('○')).toBeTruthy();
+      expect(screen.queryByText('×')).toBeNull();
+    });
+
+    it('resultState={false} のとき × が表示される', async () => {
+      await renderKeypadWithResult(false);
+      expect(screen.getByText('×')).toBeTruthy();
+      expect(screen.queryByText('○')).toBeNull();
+    });
+
+    it('resultState が true → null に変わると ○ が消える', async () => {
+      // render() は Promise を返すので await で戻り値（rerender 含む）を受け取る
+      const { rerender } = await render(
+        <NumericKeypad onValueChange={jest.fn()} resultState={true} />
+      );
+      expect(screen.getByText('○')).toBeTruthy();
+
+      await rerender(<NumericKeypad onValueChange={jest.fn()} resultState={null} />);
+      expect(screen.queryByText('○')).toBeNull();
+    });
+
+    it('resultState が false → null に変わると × が消える', async () => {
+      const { rerender } = await render(
+        <NumericKeypad onValueChange={jest.fn()} resultState={false} />
+      );
+      expect(screen.getByText('×')).toBeTruthy();
+
+      await rerender(<NumericKeypad onValueChange={jest.fn()} resultState={null} />);
+      expect(screen.queryByText('×')).toBeNull();
+    });
+  });
 });

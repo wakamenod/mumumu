@@ -62,6 +62,13 @@ function RootLayoutNav() {
               headerBackTitle: '難易度選択',
             }}
           />
+          <Stack.Screen
+            name="result"
+            options={{
+              title: '結果',
+              headerBackVisible: false,
+            }}
+          />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         </Stack>
         {/* 全画面の最前面にデバッグバナーを浮かせる */}
