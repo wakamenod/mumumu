@@ -32,14 +32,15 @@
    回答ボタン押下後、入力表示エリアに正誤の ○/× がアニメーション演出付きで重なって表示される。
    20問すべてに回答すると結果画面へ自動遷移する。
 3. *結果画面*: 正解数・経過時間を表示し、上位20位以内なら名前入力フォームを表示。
-   （現在はスタブ実装。「トップに戻る」ボタンのみ。今後ランキング登録を実装する。）
+   （現在は疎通確認実装。画面遷移時に =submitScoreFunction= を呼び出し、レスポンス JSON を画面に表示する。
+   今後、ランキング表示・名前入力フォームを実装する。）
 
 ルーティング構成（Expo Router）:
 #+BEGIN_EXAMPLE
 Stack (app/_layout.tsx)
 ├── (tabs)/index  →  /        難易度選択画面（初期画面）
 ├── quiz          →  /quiz    クイズ画面（levelId パラメータで難易度を受け取る）
-├── result        →  /result  結果画面（correct・total クエリパラメータを受け取る）
+├── result        →  /result  結果画面（correct・total・levelId・startedAt・answers クエリパラメータを受け取る）
 └── modal         →  /modal
 #+END_EXAMPLE
 

@@ -46,7 +46,7 @@ jest.mock('expo-crypto', () => ({
 /* eslint-disable import/first */
 import React from 'react';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ExpoCrypto from 'expo-crypto';
 
 import QuizScreen from '@/app/quiz';
@@ -371,6 +371,115 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       await waitFor(() => {
         expect(screen.getByText('levelId が指定されていません')).toBeTruthy();
       });
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  describe('最終問題回答後の router.push 引数（answers / startedAt / levelId）', () => {
+    let mockPush: jest.Mock;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockPush = jest.fn();
+      // useRouter が返す push を per-test の spy に差し替える
+      (useRouter as jest.Mock).mockReturnValue({
+        push: mockPush,
+        replace: jest.fn(),
+        back: jest.fn(),
+      });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('全問回答後に router.push が pathname: "/result" で呼ばれる', async () => {
+      await renderQuizScreen();
+
+      // 3問すべて回答（SHA-256 mock は常に不一致なので全問不正解）
+      for (let i = 0; i < MOCK_QUESTIONS.length; i++) {
+        await act(async () => {
+          fireEvent.press(screen.getByLabelText(i < 2 ? '回答する' : '回答して結果を見る'));
+        });
+        await act(async () => {
+          jest.advanceTimersByTime(1000);
+        });
+      }
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      const callArg = mockPush.mock.calls[0][0] as {
+        pathname: string;
+        params: Record<string, string>;
+      };
+      expect(callArg.pathname).toBe('/result');
+    });
+
+    it('router.push の params に levelId が含まれる', async () => {
+      await renderQuizScreen(); // useLocalSearchParams は { levelId: 'M' } を返す
+
+      for (let i = 0; i < MOCK_QUESTIONS.length; i++) {
+        await act(async () => {
+          fireEvent.press(screen.getByLabelText(i < 2 ? '回答する' : '回答して結果を見る'));
+        });
+        await act(async () => {
+          jest.advanceTimersByTime(1000);
+        });
+      }
+
+      const callArg = mockPush.mock.calls[0][0] as {
+        pathname: string;
+        params: Record<string, string>;
+      };
+      expect(callArg.params.levelId).toBe('M');
+    });
+
+    it('router.push の params.startedAt が数値文字列である', async () => {
+      await renderQuizScreen();
+
+      for (let i = 0; i < MOCK_QUESTIONS.length; i++) {
+        await act(async () => {
+          fireEvent.press(screen.getByLabelText(i < 2 ? '回答する' : '回答して結果を見る'));
+        });
+        await act(async () => {
+          jest.advanceTimersByTime(1000);
+        });
+      }
+
+      const callArg = mockPush.mock.calls[0][0] as {
+        pathname: string;
+        params: Record<string, string>;
+      };
+      // 数値文字列に変換できることを確認（Date.now() の結果）
+      expect(Number(callArg.params.startedAt)).toBeGreaterThan(0);
+    });
+
+    it('router.push の params.answers が JSON パース可能な配列で、全問の rawInput を含む', async () => {
+      await renderQuizScreen();
+
+      // 各問で数字キーを押してから回答する（1問目: "7"、2問目: "3"、3問目: "5"）
+      const inputs = ['7', '3', '5'];
+      for (let i = 0; i < MOCK_QUESTIONS.length; i++) {
+        await act(async () => {
+          fireEvent.press(screen.getByLabelText(inputs[i]));
+        });
+        await act(async () => {
+          fireEvent.press(screen.getByLabelText(i < 2 ? '回答する' : '回答して結果を見る'));
+        });
+        await act(async () => {
+          jest.advanceTimersByTime(1000);
+        });
+      }
+
+      const callArg = mockPush.mock.calls[0][0] as {
+        pathname: string;
+        params: Record<string, string>;
+      };
+      const parsedAnswers = JSON.parse(callArg.params.answers) as string[];
+
+      expect(parsedAnswers).toHaveLength(MOCK_QUESTIONS.length);
+      expect(parsedAnswers[0]).toBe('7');
+      expect(parsedAnswers[1]).toBe('3');
+      expect(parsedAnswers[2]).toBe('5');
     });
   });
 

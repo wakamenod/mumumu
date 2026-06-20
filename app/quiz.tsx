@@ -1,6 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import Colors from '@/constants/Colors';
@@ -30,6 +30,10 @@ export default function QuizScreen() {
   const [inputRaw, setInputRaw] = useState('');
   // 各問の正誤 (true=正解, false=不正解, null=未回答)
   const [results, setResults] = useState<(boolean | null)[]>([]);
+  // 各問の生入力文字列（submitScoreFunction に送る）
+  const [answers, setAnswers] = useState<string[]>([]);
+  // クイズ開始時刻（ms Unix timestamp）
+  const startedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +53,8 @@ export default function QuizScreen() {
         if (!cancelled) {
           setFetchState({ status: 'success', data });
           setCurrentIndex(0);
+          // 最初の問題が表示される時刻を開始時刻として記録
+          startedAtRef.current = Date.now();
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -83,17 +89,40 @@ export default function QuizScreen() {
     nextResults[currentIndex] = isCorrect;
     setResults(nextResults);
 
+    // 生入力を蓄積
+    const nextAnswers = [...answers, inputRaw];
+    setAnswers(nextAnswers);
+
     // 短いディレイの後、次の問題へ（最終問題なら結果画面へ）
     setTimeout(() => {
       const correctCount = nextResults.filter((r) => r === true).length;
       if (isLastQuestion) {
-        router.push(`/result?correct=${correctCount}&total=${totalCount}`);
+        router.push({
+          pathname: '/result',
+          params: {
+            correct: String(correctCount),
+            total: String(totalCount),
+            levelId: levelId ?? '',
+            startedAt: String(startedAtRef.current ?? Date.now()),
+            answers: JSON.stringify(nextAnswers),
+          },
+        });
       } else {
         setCurrentIndex((prev) => prev + 1);
         setInputRaw('');
       }
     }, 900);
-  }, [currentQuestion, inputRaw, currentIndex, results, isLastQuestion, totalCount, router]);
+  }, [
+    currentQuestion,
+    inputRaw,
+    currentIndex,
+    results,
+    answers,
+    isLastQuestion,
+    totalCount,
+    levelId,
+    router,
+  ]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
