@@ -48,7 +48,7 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │   │   ├── _layout.tsx
 │   │   └── index.tsx       # 難易度選択画面（初期画面）
 │   ├── quiz.tsx            # クイズ画面
-│   └── result.tsx          # 結果画面（correct・total・levelId・startedAt・answers パラメータを受け取る）
+│   └── result.tsx          # 結果画面（levelId・startedAt・answers パラメータを受け取る）
 ├── assets/                 # 画像・フォントなど
 ├── components/             # アプリ全体で共通のUI（Themed.tsx など）
 ├── constants/              # カラートークンなどのアプリ定数

@@ -453,7 +453,7 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       expect(Number(callArg.params.startedAt)).toBeGreaterThan(0);
     });
 
-    it('router.push の params.answers が JSON パース可能な配列で、全問の rawInput を含む', async () => {
+    it('router.push の params.answers が JSON パース可能な配列で、全問の { id, answer } ペアを含む', async () => {
       await renderQuizScreen();
 
       // 各問で数字キーを押してから回答する（1問目: "7"、2問目: "3"、3問目: "5"）
@@ -474,12 +474,113 @@ describe('QuizScreen — NumericKeypad との統合', () => {
         pathname: string;
         params: Record<string, string>;
       };
-      const parsedAnswers = JSON.parse(callArg.params.answers) as string[];
+      const parsedAnswers = JSON.parse(callArg.params.answers) as { id: string; answer: string }[];
 
       expect(parsedAnswers).toHaveLength(MOCK_QUESTIONS.length);
-      expect(parsedAnswers[0]).toBe('7');
-      expect(parsedAnswers[1]).toBe('3');
-      expect(parsedAnswers[2]).toBe('5');
+      expect(parsedAnswers[0]).toEqual({ id: 'q1', answer: '7' });
+      expect(parsedAnswers[1]).toEqual({ id: 'q2', answer: '3' });
+      expect(parsedAnswers[2]).toEqual({ id: 'q3', answer: '5' });
+    });
+
+    it('router.push の params に correct が含まれない（削除済み）', async () => {
+      await renderQuizScreen();
+
+      for (let i = 0; i < MOCK_QUESTIONS.length; i++) {
+        await act(async () => {
+          fireEvent.press(screen.getByLabelText(i < 2 ? '回答する' : '回答して結果を見る'));
+        });
+        await act(async () => {
+          jest.advanceTimersByTime(1000);
+        });
+      }
+
+      const callArg = mockPush.mock.calls[0][0] as {
+        pathname: string;
+        params: Record<string, string>;
+      };
+      expect(callArg.params.correct).toBeUndefined();
+    });
+
+    it('router.push の params に total が含まれない（削除済み）', async () => {
+      await renderQuizScreen();
+
+      for (let i = 0; i < MOCK_QUESTIONS.length; i++) {
+        await act(async () => {
+          fireEvent.press(screen.getByLabelText(i < 2 ? '回答する' : '回答して結果を見る'));
+        });
+        await act(async () => {
+          jest.advanceTimersByTime(1000);
+        });
+      }
+
+      const callArg = mockPush.mock.calls[0][0] as {
+        pathname: string;
+        params: Record<string, string>;
+      };
+      expect(callArg.params.total).toBeUndefined();
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  describe('二重遷移ガード（hasNavigatedToResultRef）', () => {
+    /**
+     * テスト方針:
+     *   - 全問回答後に router.push が呼ばれた後、再度「回答して結果へ」を押しても
+     *     router.push が2回目以降は呼ばれないことを確認する。
+     *   - スワイプバックで /quiz に戻り再送信するケースを模擬している。
+     *     テスト環境では router.push をモックするため実際の画面遷移は発生しないが、
+     *     push の呼び出し回数でガードの動作を検証できる。
+     */
+
+    let mockPush: jest.Mock;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockPush = jest.fn();
+      (useRouter as jest.Mock).mockReturnValue({
+        push: mockPush,
+        replace: jest.fn(),
+        back: jest.fn(),
+      });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('最終問題を2回回答しても router.push は1回しか呼ばれない', async () => {
+      await renderQuizScreen();
+
+      // 1〜2問目を回答して進む
+      for (let i = 0; i < MOCK_QUESTIONS.length - 1; i++) {
+        await act(async () => {
+          fireEvent.press(screen.getByLabelText('回答する'));
+        });
+        await act(async () => {
+          jest.advanceTimersByTime(1000);
+        });
+      }
+
+      // 最終問題（3問目）を1回目回答 → router.push が呼ばれる
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('回答して結果を見る'));
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+
+      // 再度「回答して結果へ」を押す（スワイプバック後の再押下を模擬）
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('回答して結果を見る'));
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      // ガードにより2回目の push は実行されない
+      expect(mockPush).toHaveBeenCalledTimes(1);
     });
   });
 

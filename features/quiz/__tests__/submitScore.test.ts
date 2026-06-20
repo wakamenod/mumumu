@@ -22,7 +22,11 @@ jest.mock('@/lib/firebase', () => {
 
 /* eslint-disable import/first */
 import { submitScore } from '@/features/quiz/api/submitScore';
-import type { SubmitScoreRequest, SubmitScoreResponse } from '@/features/quiz/api/submitScore';
+import type {
+  AnswerEntry,
+  SubmitScoreRequest,
+  SubmitScoreResponse,
+} from '@/features/quiz/api/submitScore';
 /* eslint-enable import/first */
 
 // ─── モックの callable を取得 ─────────────────────────────────
@@ -32,30 +36,14 @@ const callable: jest.Mock = firebaseMock.__callable;
 
 // ─── テスト用ダミーデータ ─────────────────────────────────────
 
+const MOCK_ANSWERS: AnswerEntry[] = Array.from({ length: 20 }, (_, i) => ({
+  id: `q${i + 1}`,
+  answer: String(i + 1),
+}));
+
 const MOCK_REQUEST: SubmitScoreRequest = {
   level: 'A',
-  answers: [
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7',
-    '8',
-    '9',
-    '10',
-    '11',
-    '12',
-    '13',
-    '14',
-    '15',
-    '16',
-    '17',
-    '18',
-    '19',
-    '20',
-  ],
+  answers: MOCK_ANSWERS,
   startedAt: 1718268420000,
 };
 

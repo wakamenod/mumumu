@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } 
 import Colors from '@/constants/Colors';
 import { DIFFICULTY_LEVELS, MathDisplay, NumericKeypad, getQuiz } from '@/features/quiz';
 import type { GetQuizResponse } from '@/features/quiz';
+import type { AnswerEntry } from '@/features/quiz/api/submitScore';
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
 
@@ -30,10 +31,12 @@ export default function QuizScreen() {
   const [inputRaw, setInputRaw] = useState('');
   // 各問の正誤 (true=正解, false=不正解, null=未回答)
   const [results, setResults] = useState<(boolean | null)[]>([]);
-  // 各問の生入力文字列（submitScoreFunction に送る）
-  const [answers, setAnswers] = useState<string[]>([]);
+  // 各問の { id, answer } ペア（submitScoreFunction に送る）
+  const [answers, setAnswers] = useState<AnswerEntry[]>([]);
   // クイズ開始時刻（ms Unix timestamp）
   const startedAtRef = useRef<number | null>(null);
+  // 結果画面へのナビゲーション済みフラグ（スワイプバック後の二重送信を防止）
+  const hasNavigatedToResultRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,19 +92,19 @@ export default function QuizScreen() {
     nextResults[currentIndex] = isCorrect;
     setResults(nextResults);
 
-    // 生入力を蓄積
-    const nextAnswers = [...answers, inputRaw];
+    // 生入力を { id, answer } ペアとして蓄積
+    const nextAnswers = [...answers, { id: currentQuestion.id, answer: inputRaw }];
     setAnswers(nextAnswers);
 
     // 短いディレイの後、次の問題へ（最終問題なら結果画面へ）
     setTimeout(() => {
-      const correctCount = nextResults.filter((r) => r === true).length;
       if (isLastQuestion) {
+        // スワイプバック後の再押下などによる二重送信を防止
+        if (hasNavigatedToResultRef.current) return;
+        hasNavigatedToResultRef.current = true;
         router.push({
           pathname: '/result',
           params: {
-            correct: String(correctCount),
-            total: String(totalCount),
             levelId: levelId ?? '',
             startedAt: String(startedAtRef.current ?? Date.now()),
             answers: JSON.stringify(nextAnswers),
@@ -112,17 +115,7 @@ export default function QuizScreen() {
         setInputRaw('');
       }
     }, 900);
-  }, [
-    currentQuestion,
-    inputRaw,
-    currentIndex,
-    results,
-    answers,
-    isLastQuestion,
-    totalCount,
-    levelId,
-    router,
-  ]);
+  }, [currentQuestion, inputRaw, currentIndex, results, answers, isLastQuestion, levelId, router]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 

@@ -1,9 +1,15 @@
 import { functions } from '../../../lib/firebase';
 
+/** 問題 ID とユーザーが入力した生の解答のペア */
+export interface AnswerEntry {
+  id: string;
+  answer: string;
+}
+
 /** submitScoreFunction へのリクエスト型 */
 export interface SubmitScoreRequest {
   level: string;
-  answers: string[];
+  answers: AnswerEntry[];
   startedAt: number;
 }
 
@@ -31,7 +37,7 @@ const submitScoreCallable = functions.httpsCallable<SubmitScoreRequest, SubmitSc
 
 /**
  * Cloud Functions の submitScoreFunction を呼び出してスコアを送信する。
- * @param req level / answers(生入力文字列20件) / startedAt(ms Unix timestamp)
+ * @param req level / answers({ id, answer } ペア20件) / startedAt(ms Unix timestamp)
  */
 export async function submitScore(req: SubmitScoreRequest): Promise<SubmitScoreResponse> {
   const result = await submitScoreCallable(req);
