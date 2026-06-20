@@ -55,7 +55,8 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │   └── quiz/               # クイズ機能ドメイン
 │       ├── __tests__/      # クイズ機能のテスト群
 │       ├── components/     # クイズ機能固有のUIコンポーネント
-│       │   └── LevelStepper.tsx
+│       │   ├── LevelStepper.tsx
+│       │   └── MathDisplay.tsx   # LaTeX 数式レンダリング
 │       ├── types.ts        # 型定義（DifficultyLevel など）
 │       ├── constants.ts    # ドメイン定数（DIFFICULTY_LEVELS など）
 │       └── index.ts        # 外部に公開するインターフェース
@@ -80,6 +81,7 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 | グローバル状態管理   | Zustand                                                  |
 | ディレクトリ設計     | Featuresベース + Hooksによるロジック分離                  |
 | アニメーション       | react-native-reanimated v4 (useSharedValue + withSpring) |
+| LaTeX レンダリング   | react-native-mathjax-html-to-svg + react-native-svg     |
 | テスト               | Jest + @testing-library/react-native v14                 |
 
 * 7. テスト戦略
@@ -117,3 +119,80 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
   - =transformIgnorePatterns=: reanimated / worklets を Jest の transform 対象に含める
   - =setupFilesAfterEnv=: =jest.setup.ts= を指定
   - =collectCoverageFrom=: =features/=, =app/=, =components/= を対象にカバレッジ計測
+
+* 8. LaTeX レンダリング
+
+** 8.1 採用ライブラリと選定理由
+クイズの問題文はサーバー（Firebase Storage）から LaTeX 形式の文字列として配信される。
+これをアプリ側でレンダリングするために、以下のライブラリを採用する。
+
+| ライブラリ                         | 役割                                       |
+|------------------------------------+--------------------------------------------|
+| =react-native-mathjax-html-to-svg= | LaTeX → SVG 変換（MathJax 内蔵）           |
+| =react-native-svg=                 | SVG のネイティブ描画                        |
+
+採用理由：
+- *WebView を使用しない*: ネイティブの SVG 描画のみで完結し、WebView のオーバーヘッドがない。
+- *New Architecture 対応*: 純粋 JS ライブラリのため Fabric / TurboModules の互換性問題が発生しない。
+- *MathJax 内蔵*: ライブラリ内に MathJax をバンドル済みのため、別途 MathJax のセットアップが不要。
+- *大学レベルまでの数式を網羅*: MathJax ベースのため複雑な LaTeX（積分・行列・複素数など）に対応。
+
+** 8.2 コンポーネント API
+
+=features/quiz/components/MathDisplay.tsx= がドメイン内の LaTeX 描画コンポーネントである。
+
+#+BEGIN_SRC typescript
+import { MathDisplay } from '@/features/quiz';
+
+// サーバーから受け取った LaTeX 文字列をそのまま渡す（$$ デリミタ不要）
+<MathDisplay latex={question.question} />
+<MathDisplay latex={question.question} fontSize={18} color="#1A2A6C" />
+#+END_SRC
+
+| Prop       | 型       | デフォルト  | 説明                               |
+|------------+----------+-------------+------------------------------------|
+| =latex=    | string   | （必須）    | LaTeX 文字列（デリミタなし）        |
+| =fontSize= | number   | 22          | 数式のフォントサイズ（px）          |
+| =color=    | string   | ="#1A2A6C"= | 数式の色（CSS カラー文字列）        |
+
+内部では =$$...$$= で囲んでディスプレイ数式（ブロック表示）としてレンダリングする。
+
+** 8.3 不採用とした代替案
+
+| 候補ライブラリ      | 不採用理由                                                                          |
+|---------------------+-------------------------------------------------------------------------------------|
+| =mathjax-full=      | Metro バンドラーと非互換。動的 =require= と循環依存により Hermes 実行時にクラッシュ。 |
+| =react-native-math-view= | New Architecture 非対応（旧 Bridge 前提の設計）。                              |
+| =react-native-katex= | WebView を使用するため不採用。                                                     |
+| KaTeX（単体）       | HTML を出力するが React Native でそのまま描画できず、別途 HTML レンダラーが必要。   |
+
+*=mathjax-full= の失敗経緯（記録）*:
+=mathjax-full= は Node.js 向けの LaTeX → SVG 変換が可能なライブラリだが、以下の理由で採用を断念した。
+1. *動的 =require= の問題*: TeX パッケージ読み込みに =CONFIG.require(url)= を使用するが、
+   Metro の静的解析モデルと非互換。実行時に「property 'require' doesn't exist」エラーが発生。
+2. *循環依存*: =components/loader.js= と =components/package.js= の循環依存が
+   Metro のモジュールキャッシュと衝突し、=CONFIG= が =undefined= のまま参照される。
+3. *=AllPackages= による事前登録も無効*: =AllPackages.js= の静的 import で回避を試みたが、
+   Configuration 初期化時に動的ローダーが呼ばれるため解決に至らなかった。
+
+** 8.4 iOS ビルド上の注意（Podfile パッチ）
+=react-native-svg= の追加に伴い、iOS ネイティブビルドで以下の問題が発生するため対処が必要である。
+
+*問題*: React Native が依存する C++ ライブラリ =fmt= が、Apple Clang 16+（Xcode 16 以降）で
+=FMT_STRING= の =consteval= 評価に失敗し、Xcode ビルドエラーになる。
+
+*原因*: =fmt/include/fmt/base.h= が Apple Clang 14 未満のみ consteval を無効化しており、
+Clang 16 は有効化されるが非定数文脈での =consteval= 呼び出しを拒否する。
+また =base.h= は =#ifndef= ガードなしに =#define= するためコンパイルフラグでの上書きが不可。
+
+*対処*: =ios/Podfile= の =post_install= フックで =base.h= を直接パッチし、
+全 Apple Clang バージョンで consteval を無効化する。このパッチは =pod install= のたびに自動適用される。
+
+#+BEGIN_SRC ruby
+# ios/Podfile (post_install ブロック内)
+fmt_base_h = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'base.h')
+# '#elif defined(__apple_build_version__) && __apple_build_version__ < 14000029L'
+# → '#elif defined(__apple_build_version__)'  に書き換え
+#+END_SRC
+
+このため =ios/Podfile= は =.gitignore= の例外として git 管理対象に含めている（=/ios/*= + =!/ios/Podfile=）。
