@@ -141,7 +141,7 @@ export default function QuizScreen() {
       </View>
 
       {/* ─ ナビゲーションボタン（確認用） ─ */}
-      {fetchState.status === 'success' && (
+      {fetchState.status === 'success' && totalCount > 0 && (
         <View style={styles.navRow}>
           {/* 前へ */}
           <Pressable
