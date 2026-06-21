@@ -81,7 +81,7 @@ Stack (app/_layout.tsx)
 - =0= 〜 =9= の数値ボタン
 - =/= （スラッシュ）ボタン
 - =削除= ボタン
-- =回答= ボタン（最終問題では「回答して結果へ」ラベルに変化する）
+- =回答= ボタン（最終問題では「回答して結果へ」ラベルに変化する。押下中は =isSubmittingRef= で再入を防止）
 
 ** 4.2 入力バリデーション制御（ボタンの活性・非活性）
 - *スラッシュ制限*: 文字列内にすでに =/= が存在する場合、2回目の =/= 入力は受け付けない（ボタンを非活性化）。
@@ -135,14 +135,27 @@ Stack (app/_layout.tsx)
 クイズ終了後に =submitScoreFunction= が複数回呼ばれると、同一プレイヤーが1回の回答で
 複数回ランク登録できてしまうため、以下の2段階の対策を実施する。
 
-| 対策                     | 実装箇所          | 防止対象                                           |
-|--------------------------+-------------------+----------------------------------------------------|
-| =gestureEnabled: false=  | =app/_layout.tsx= | iOS スワイプバックによる =/result= → =/quiz= への戻り |
-| =hasNavigatedToResultRef= | =app/quiz.tsx=   | スワイプバック後または再押下による二重 =router.push= |
+| 対策                     | 実装箇所                  | 防止対象                                                             |
+|--------------------------+---------------------------+----------------------------------------------------------------------|
+| =gestureEnabled: false=  | =app/_layout.tsx=         | iOS スワイプバックによる =/result= → =/quiz= への戻り                |
+| =hasNavigatedToResultRef= | =app/quiz.tsx=           | スワイプバック後または再押下による二重 =router.push=                 |
+| =AppButton= スロットル   | =components/AppButton.tsx= | アプリ全体のボタン連打（500ms 以内の再タップをスロットルで無効化）  |
+| =isSubmittingRef=        | =app/quiz.tsx=            | 回答処理中（crypto 非同期 + 900ms 待機中）の回答ボタン再押下         |
 
 =hasNavigatedToResultRef= は =useRef(false)= で管理する。
 =setTimeout= コールバック内で =isLastQuestion= のとき、フラグが =true= なら即 =return=、
 =false= なら =true= に立ててから =router.push= することで、二重遷移を完全に防止する。
+
+*=AppButton= による連打防止*:
+アプリ全体の =Pressable= / =TouchableOpacity= を =components/AppButton.tsx= に統一した。
+=AppButton= は =onPress= に 500ms のスロットルを内蔵し、インターバル内の再タップを自動的に無視する。
+=throttleMs= prop で間隔を変更でき、数値キーパッド（=NumericKeypad=）では =throttleMs={100}= を指定している。
+
+*=isSubmittingRef= による回答ボタン再入防止*:
+回答ボタンは押下後に =Crypto.digestStringAsync=（非同期）と =setTimeout= 900ms が直列で走る。
+=AppButton= の 500ms スロットルが切れた後も処理が継続しているため、
+=isSubmittingRef = useRef(false)= でガードし、=handleSubmit= 先頭で =true= にセット、
+=setTimeout= コールバック内（次問遷移または結果画面遷移の直前）で =false= にリセットする。
 
 *バックグラウンド→フォアグラウンド復帰について*:
 アプリのバックグラウンド/フォアグラウンド切り替えではコンポーネントはアンマウントされないため、

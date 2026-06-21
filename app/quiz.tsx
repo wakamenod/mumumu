@@ -1,8 +1,9 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
+import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
 import { DIFFICULTY_LEVELS, MathDisplay, NumericKeypad, getQuiz } from '@/features/quiz';
 import type { GetQuizResponse } from '@/features/quiz';
@@ -37,6 +38,8 @@ export default function QuizScreen() {
   const startedAtRef = useRef<number | null>(null);
   // 結果画面へのナビゲーション済みフラグ（スワイプバック後の二重送信を防止）
   const hasNavigatedToResultRef = useRef(false);
+  // 回答処理中フラグ（非同期処理 + 900ms 待機中の二重送信を防止）
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +85,8 @@ export default function QuizScreen() {
 
   const handleSubmit = useCallback(async () => {
     if (!currentQuestion) return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     // SHA-256 ハッシュを計算して比較（仕様 §5.2: 生文字列をそのままハッシュ化）
     const hash = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, inputRaw);
@@ -98,6 +103,7 @@ export default function QuizScreen() {
 
     // 短いディレイの後、次の問題へ（最終問題なら結果画面へ）
     setTimeout(() => {
+      isSubmittingRef.current = false;
       if (isLastQuestion) {
         // スワイプバック後の再押下などによる二重送信を防止
         if (hasNavigatedToResultRef.current) return;
@@ -183,7 +189,7 @@ export default function QuizScreen() {
       {/* ─ 回答ボタン ─ */}
       {fetchState.status === 'success' && totalCount > 0 && (
         <View style={styles.navRow}>
-          <Pressable
+          <AppButton
             style={[styles.submitButton, { backgroundColor: level?.color ?? colors.accent }]}
             onPress={handleSubmit}
             accessibilityLabel={isLastQuestion ? '回答して結果を見る' : '回答する'}
@@ -191,7 +197,7 @@ export default function QuizScreen() {
             <Text style={styles.submitButtonText}>
               {isLastQuestion ? '回答して結果へ' : '回答'}
             </Text>
-          </Pressable>
+          </AppButton>
         </View>
       )}
     </View>

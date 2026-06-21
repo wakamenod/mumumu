@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Pressable, StatusBar, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { StatusBar, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
+import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
 import { LevelStepper } from '@/features/quiz/components/LevelStepper';
 import { DIFFICULTY_LEVELS, TOTAL_QUESTIONS } from '@/features/quiz';
@@ -55,7 +56,7 @@ export default function DifficultySelectScreen() {
         </View>
 
         {/* Start button */}
-        <Pressable
+        <AppButton
           onPress={handleStart}
           style={({ pressed }) => [
             styles.startButton,
@@ -68,7 +69,7 @@ export default function DifficultySelectScreen() {
           accessibilityRole="button"
         >
           <Text style={styles.startButtonText}>▶　スタート！</Text>
-        </Pressable>
+        </AppButton>
       </View>
     </SafeAreaView>
   );

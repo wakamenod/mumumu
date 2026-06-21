@@ -50,7 +50,7 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │   ├── quiz.tsx            # クイズ画面
 │   └── result.tsx          # 結果画面（levelId・startedAt・answers パラメータを受け取る）
 ├── assets/                 # 画像・フォントなど
-├── components/             # アプリ全体で共通のUI（Themed.tsx など）
+├── components/             # アプリ全体で共通のUI（AppButton.tsx・Themed.tsx など）
 ├── constants/              # カラートークンなどのアプリ定数
 ├── features/               # 機能ごとに閉じたカプセル
 │   └── quiz/               # クイズ機能ドメイン
@@ -92,6 +92,7 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 | ハッシュ演算         | expo-crypto (Crypto.digestStringAsync / SHA-256)         |
 | LaTeX レンダリング   | react-native-mathjax-html-to-svg + react-native-svg     |
 | テスト               | Jest + @testing-library/react-native v14                 |
+| ボタン連打防止       | AppButton コンポーネント（Pressable ラッパー・スロットル内蔵） |
 
 * 7. テスト戦略
 

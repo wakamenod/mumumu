@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, useColorScheme, type ViewStyle } from 'react-native';
+import { StyleSheet, Text, View, useColorScheme, type ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
 import { DIFFICULTY_LEVELS } from '../constants';
 import type { DifficultyLevel } from '../types';
@@ -133,7 +134,7 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
 
       <View style={styles.row}>
         {/* Left arrow */}
-        <Pressable
+        <AppButton
           onPress={() => navigate(-1)}
           disabled={!canGoBack}
           hitSlop={16}
@@ -148,7 +149,7 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
           accessibilityRole="button"
         >
           <Text style={styles.arrowText}>‹</Text>
-        </Pressable>
+        </AppButton>
 
         {/* Animated card */}
         <View style={styles.cardWrapper}>
@@ -158,7 +159,7 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
         </View>
 
         {/* Right arrow */}
-        <Pressable
+        <AppButton
           onPress={() => navigate(1)}
           disabled={!canGoForward}
           hitSlop={16}
@@ -173,7 +174,7 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
           accessibilityRole="button"
         >
           <Text style={styles.arrowText}>›</Text>
-        </Pressable>
+        </AppButton>
       </View>
 
       {/* Dot indicators */}

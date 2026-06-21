@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { StyleSheet, Text, View, useColorScheme } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
@@ -130,7 +131,7 @@ export function NumericKeypad({ onValueChange, resultState }: Props) {
       case 'digit': {
         const disabled = key.value === '0' && zeroDisabled;
         return (
-          <TouchableOpacity
+          <AppButton
             key={idx}
             style={[
               styles.key,
@@ -139,16 +140,16 @@ export function NumericKeypad({ onValueChange, resultState }: Props) {
             ]}
             onPress={() => handleDigit(key.value)}
             disabled={disabled}
-            activeOpacity={0.7}
+            throttleMs={100}
             accessibilityLabel={key.label}
           >
             <Text style={[styles.keyLabel, { color: colors.levelLabel }]}>{key.label}</Text>
-          </TouchableOpacity>
+          </AppButton>
         );
       }
       case 'slash': {
         return (
-          <TouchableOpacity
+          <AppButton
             key={idx}
             style={[
               styles.key,
@@ -157,20 +158,20 @@ export function NumericKeypad({ onValueChange, resultState }: Props) {
             ]}
             onPress={handleSlash}
             disabled={slashDisabled}
-            activeOpacity={0.7}
+            throttleMs={100}
             accessibilityLabel="スラッシュ（分数）"
           >
             <Text style={[styles.keyLabel, { color: colors.accent }]}>/</Text>
-          </TouchableOpacity>
+          </AppButton>
         );
       }
       case 'sign': {
         return (
-          <TouchableOpacity
+          <AppButton
             key={idx}
             style={[styles.key, { flex: 1, backgroundColor: colors.cardBackground }]}
             onPress={handleSign}
-            activeOpacity={0.7}
+            throttleMs={100}
             accessibilityLabel={sign === '+' ? 'マイナスに切り替え' : 'プラスに切り替え'}
           >
             <Text style={[styles.keyLabel, { color: colors.accent }]}>
@@ -179,13 +180,13 @@ export function NumericKeypad({ onValueChange, resultState }: Props) {
             <Text style={[styles.keySubLabel, { color: colors.levelDescription }]}>
               {sign === '+' ? '現在: +' : '現在: −'}
             </Text>
-          </TouchableOpacity>
+          </AppButton>
         );
       }
       case 'backspace': {
         const disabled = digits.length === 0;
         return (
-          <TouchableOpacity
+          <AppButton
             key={idx}
             style={[
               styles.key,
@@ -194,11 +195,11 @@ export function NumericKeypad({ onValueChange, resultState }: Props) {
             ]}
             onPress={handleBackspace}
             disabled={disabled}
-            activeOpacity={0.7}
+            throttleMs={100}
             accessibilityLabel="1文字削除"
           >
             <Text style={[styles.keyLabel, { color: colors.levelLabel }]}>⌫</Text>
-          </TouchableOpacity>
+          </AppButton>
         );
       }
     }

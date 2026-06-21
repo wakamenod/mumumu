@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
   useColorScheme,
 } from 'react-native';
 
+import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
 import { submitScore } from '@/features/quiz/api/submitScore';
 import type {
@@ -142,13 +142,13 @@ export default function ResultScreen() {
 
       {/* ─ トップに戻るボタン ─ */}
       <View style={styles.buttonArea}>
-        <Pressable
+        <AppButton
           style={[styles.button, { backgroundColor: colors.accent }]}
           onPress={() => router.replace('/')}
           accessibilityLabel="トップに戻る"
         >
           <Text style={styles.buttonText}>トップに戻る</Text>
-        </Pressable>
+        </AppButton>
       </View>
     </View>
   );
