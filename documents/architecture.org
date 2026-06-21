@@ -46,7 +46,8 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │   ├── _layout.tsx         # ルートスタック設定（quiz / result ルートを登録）
 │   ├── (tabs)/             # タブグループ
 │   │   ├── _layout.tsx
-│   │   └── index.tsx       # 難易度選択画面（初期画面）
+│   │   ├── index.tsx       # 難易度選択画面（Tab 1: calculator アイコン）
+│   │   └── two.tsx         # ランキング画面（Tab 2: trophy アイコン）
 │   ├── quiz.tsx            # クイズ画面
 │   └── result.tsx          # 結果画面（levelId・startedAt・answers パラメータを受け取る）
 ├── assets/                 # 画像・フォントなど
@@ -55,19 +56,29 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 ├── features/               # 機能ごとに閉じたカプセル
 │   └── quiz/               # クイズ機能ドメイン
 │       ├── __tests__/      # クイズ機能のテスト群
+│       │   ├── constants.test.ts
+│       │   ├── DifficultySelectScreen.test.tsx
+│       │   ├── getRanking.test.ts        # getRankingFunction のユニットテスト
+│       │   ├── LevelStepper.test.tsx
+│       │   ├── MathDisplay.test.tsx
+│       │   ├── NumericKeypad.test.tsx
 │       │   ├── QuizScreen.test.tsx
+│       │   ├── RankingScreen.test.tsx    # ランキング画面の統合テスト
+│       │   ├── RankingTable.test.tsx     # RankingTable コンポーネントのテスト
 │       │   ├── ResultScreen.test.tsx
 │       │   └── submitScore.test.ts
 │       ├── api/            # Cloud Functions 呼び出し層
 │       │   ├── getQuiz.ts          # getQuizFunction 呼び出し
-│       │   └── submitScore.ts      # submitScoreFunction 呼び出し
+│       │   ├── getRanking.ts       # getRankingFunction 呼び出し
+│       │   └── submitScore.ts      # submitScoreFunction 呼び出し・RankingEntry 型定義
 │       ├── components/     # クイズ機能固有のUIコンポーネント
 │       │   ├── LevelStepper.tsx
 │       │   ├── MathDisplay.tsx     # LaTeX 数式レンダリング
-│       │   └── NumericKeypad.tsx   # カスタム数値キーパッド（正誤オーバーレイ内蔵）
+│       │   ├── NumericKeypad.tsx   # カスタム数値キーパッド（正誤オーバーレイ内蔵）
+│       │   └── RankingTable.tsx    # ランキングテーブル（結果画面・ランキング画面で共用）
 │       ├── types.ts        # 型定義（DifficultyLevel など）
 │       ├── constants.ts    # ドメイン定数（DIFFICULTY_LEVELS など）
-│       └── index.ts        # 外部に公開するインターフェース
+│       └── index.ts        # 外部に公開するインターフェース（barrel export）
 └── jest.setup.ts           # Jest セットアップ（モック初期化）
 #+END_SRC
 

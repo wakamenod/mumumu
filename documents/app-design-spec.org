@@ -34,16 +34,24 @@
 3. *結果画面*: =submitScoreFunction= のレスポンスをもとに正解数・経過時間を表示する。
    ランクイン（=ranked: true=）の場合は上位20位分のランキングテーブルを合わせて表示する。
    ランキングのレスポンスが20件未満の場合、不足行はすべて「—」で埋めて常に20行表示する。
-   自分のランク行はハイライト表示する。
+   自分のランク行は =accent= カラーでハイライト表示する。
    （名前入力フォームは今後実装予定。）
+4. *ランキング画面*: タブバー右側（トロフィーアイコン）のタブで常時アクセス可能。
+   =getRankingFunction= を呼び出してレベルごとのランキングを表示する。
+   画面上部の横スクロールタブ（A〜M の13レベル）でレベルを切り替える（デフォルトは M = 小学1年生）。
+   切り替え時に選択中レベルの学年名・難易度星を表示する。
+   認証不要のため、未プレイのユーザーでも閲覧できる。
+   自分のランク強調なし（=RankingTable= コンポーネントを =myRank= 指定なしで使用）。
 
 ルーティング構成（Expo Router）:
 #+BEGIN_EXAMPLE
 Stack (app/_layout.tsx)
-├── (tabs)/index  →  /        難易度選択画面（初期画面）
-├── quiz          →  /quiz    クイズ画面（levelId パラメータで難易度を受け取る）
-├── result        →  /result  結果画面（levelId・startedAt・answers クエリパラメータを受け取る）
-└── modal         →  /modal
+├── (tabs)/                  タブグループ（タブバー常時表示）
+│   ├── index  →  /          難易度選択画面（Tab 1: calculator アイコン）
+│   └── two    →  /          ランキング画面（Tab 2: trophy アイコン）
+├── quiz       →  /quiz      クイズ画面（levelId パラメータで難易度を受け取る）
+├── result     →  /result    結果画面（levelId・startedAt・answers クエリパラメータを受け取る）
+└── modal      →  /modal
 #+END_EXAMPLE
 
 ** 3.2 難易度選択画面の UI 仕様
@@ -131,6 +139,17 @@ Stack (app/_layout.tsx)
 - レスポンスの =rankings= が20件未満の場合、不足行はすべて各セルを「—」で埋めて常に20行表示する。
 - 自分のランク行（=rank= フィールドが一致する行）を =accent= カラーでハイライト表示する。
 
+ランキングテーブルは =features/quiz/components/RankingTable.tsx= として独立したコンポーネントに切り出されており、
+結果画面（=myRank= を渡してハイライト有効）とランキング画面（=myRank= を省略してハイライトなし）の両方で共用する。
+
+#+BEGIN_SRC typescript
+// 結果画面での使用（自分の行をハイライト）
+<RankingTable rankings={rankings} myRank={rank} colors={colors} />
+
+// ランキング画面での使用（ハイライトなし）
+<RankingTable rankings={rankings} colors={colors} />
+#+END_SRC
+
 ** 4.5.2 二重送信防止（ランキング重複登録の防止）
 クイズ終了後に =submitScoreFunction= が複数回呼ばれると、同一プレイヤーが1回の回答で
 複数回ランク登録できてしまうため、以下の2段階の対策を実施する。
@@ -196,7 +215,7 @@ Storage 側の JSON には生の正解（=answer=）を保持し、Cloud Functio
 }
 #+END_SRC
 
-- *��ライアントへのレスポンス（Cloud Functions 経由）*:
+- *クライアントへのレスポンス（Cloud Functions 経由）*:
 #+BEGIN_SRC json
 {
   "order": 1,
@@ -290,9 +309,57 @@ runTransaction(db, async (t) => {
 20 位と完全同スコア・同タイムの場合、=created_at= の早い方（先着）を上位とする。
 新エントリを追加後にソートするため、同率では末尾（新エントリ）が自然に切り捨てられる。
 
-* 9. 運用・コスト管理
-** 9.1 コスト見込み
+* 9. Cloud Functions API 仕様
+** 9.1 getRankingFunction（ランキング一覧取得）
+
+指定したレベルの最新ランキング上位20件を返す。ユーザー認証不要。
+
+*** 9.1.1 呼び出し方法
+
+#+BEGIN_SRC typescript
+const getRanking = httpsCallable(functions, "getRankingFunction");
+const result = await getRanking({ level: "A" });
+#+END_SRC
+
+クライアント側ラッパー: =features/quiz/api/getRanking.ts= の =getRanking(level: string)= を使用する。
+
+*** 9.1.2 リクエスト
+
+| フィールド | 型       | 必須 | 説明                           |
+|------------+----------+------+--------------------------------|
+| =level=    | =string= | ○    | 取得するレベルの識別子（A〜M） |
+
+*** 9.1.3 レスポンス
+
+#+BEGIN_SRC json
+{
+  "rankings": [
+    { "rank": 1, "username": "BBBBB", "correct_count": 20, "elapsed_time": 30.1 },
+    { "rank": 2, "username": "CCCCC", "correct_count": 20, "elapsed_time": 35.2 },
+    { "rank": 3, "username": "-----", "correct_count": 18, "elapsed_time": 52.4 }
+  ]
+}
+#+END_SRC
+
+| フィールド      | 型               | 説明                                                          |
+|-----------------+------------------+---------------------------------------------------------------|
+| =rank=          | =number=         | 順位（1〜20）                                                 |
+| =username=      | =string=         | ユーザー名。未登録エントリは ="-----"= と表示される           |
+| =correct_count= | =number=         | 正解数                                                        |
+| =elapsed_time=  | =number=         | 経過時間（秒）                                                |
+
+ランキングデータが存在しない場合（誰もプレイしていない）は =rankings: []= を返す（エラーにしない）。
+=claim_token= はレスポンスに含まれない。
+
+*** 9.1.4 エラーレスポンス
+
+| コード             | 発生条件                                    |
+|--------------------+---------------------------------------------|
+| =invalid-argument= | =level= が未指定・A〜M 以外・文字列以外     |
+
+* 10. 運用・コスト管理
+** 10.1 コスト見込み
 通常運用（月間数万プレイ規模）であれば、Cloud Functions・Firestore・Storage の無料枠内にほぼ収まるため、固定費（Artifact Registry の保管料数十円/月）のみで運用可能。
 
-** 9.2 安全対策
+** 10.2 安全対策
 開発中およびリリース後の事故を防ぐため、Firebaseに「予算アラート（例: 500円超過で通知）」を必ず設定し、バグによる無限ループ等の課金スパイクを防止する。
