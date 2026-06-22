@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -12,8 +12,18 @@ import {
 import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
 import { submitScore } from '@/features/quiz/api/submitScore';
-import type { AnswerEntry, SubmitScoreResponse } from '@/features/quiz/api/submitScore';
-import { RankingTable, formatTime } from '@/features/quiz/components/RankingTable';
+import type {
+  AnswerEntry,
+  RankingEntry,
+  SubmitScoreResponse,
+} from '@/features/quiz/api/submitScore';
+import { InitialsEntryForm } from '@/features/quiz/components/InitialsEntryForm';
+import {
+  RankingTable,
+  RankingTableBody,
+  RankingTableHeader,
+  formatTime,
+} from '@/features/quiz/components/RankingTable';
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
 
@@ -36,6 +46,22 @@ export default function ResultScreen() {
 
   const [submitState, setSubmitState] = useState<SubmitState>({ status: 'loading' });
 
+  /** イニシャル入力で確定した文字列 */
+  const [username, setUsername] = useState<string>('');
+  /** END ボタンが押されて入力が完了したか */
+  const [initialsSubmitted, setInitialsSubmitted] = useState<boolean>(false);
+  /** ランキング（username 更新をローカルに反映するためのコピー） */
+  const [localRankings, setLocalRankings] = useState<RankingEntry[] | null>(null);
+
+  // ─── スクロール制御（ランクイン時・自分の行をセンタリング） ────────────────
+  const scrollRef = useRef<ScrollView>(null);
+  /** ランキング ScrollView の表示高さ（onLayout で更新） */
+  const scrollViewHeightRef = useRef<number>(0);
+  /** 初期スクロールを一度だけ実行するためのフラグ */
+  const hasScrolledRef = useRef<boolean>(false);
+  /** 1行あたりの推定高さ: paddingVertical 8×2 + fontSize 14 ≈ 36pt */
+  const ROW_HEIGHT = 36;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -52,6 +78,7 @@ export default function ResultScreen() {
 
         if (!cancelled) {
           setSubmitState({ status: 'success', data });
+          setLocalRankings(data.rankings);
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -69,62 +96,148 @@ export default function ResultScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** END が押されるまでトップに戻るボタンを非活性にする */
+  const isButtonDisabled =
+    submitState.status === 'success' && submitState.data.ranked && !initialsSubmitted;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.screenBackground }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={[styles.title, { color: colors.levelLabel }]}>結果</Text>
-
-        {/* ─ ローディング ─ */}
-        {submitState.status === 'loading' && (
-          <View style={styles.loadingArea}>
-            <ActivityIndicator size="large" color={colors.accent} />
-            <Text style={[styles.loadingText, { color: colors.levelDescription }]}>採点中...</Text>
-          </View>
-        )}
-
-        {/* ─ エラー ─ */}
-        {submitState.status === 'error' && (
-          <View style={styles.errorArea}>
-            <Text style={styles.errorIcon}>⚠️</Text>
-            <Text style={[styles.errorLabel, { color: colors.levelLabel }]}>
-              エラーが発生しました
-            </Text>
-            <Text style={[styles.errorMessage, { color: colors.levelDescription }]}>
-              {submitState.message}
-            </Text>
-          </View>
-        )}
-
-        {/* ─ 成功 ─ */}
-        {submitState.status === 'success' && (
+      {/* ══════════════════════════════════════════════════════════════════
+          ランクイン & 入力中: 固定エリア（フォーム＋ヘッダー）＋スクロール行
+          ══════════════════════════════════════════════════════════════════ */}
+      {submitState.status === 'success' &&
+        submitState.data.ranked &&
+        !initialsSubmitted &&
+        localRankings && (
           <>
-            {/* 正解数・経過時間 */}
-            <ScoreSummary
-              correctCount={submitState.data.correct_count}
-              elapsedTime={submitState.data.elapsed_time}
-              colors={colors}
-            />
-
-            {/* ランキングテーブル（ranked: true のみ） */}
-            {submitState.data.ranked && (
-              <RankingTable
-                rankings={submitState.data.rankings}
-                myRank={submitState.data.rank}
+            {/* 固定エリア: InitialsEntryForm ＋ ランキングタイトル＋ヘッダー行 */}
+            <View style={[styles.fixedArea, { backgroundColor: colors.screenBackground }]}>
+              <InitialsEntryForm
+                value={username}
+                onPressLetter={(char) =>
+                  setUsername((prev) => (prev.length < 5 ? prev + char : prev))
+                }
+                onBackspace={() => setUsername((prev) => prev.slice(0, -1))}
+                onEnd={() => {
+                  setLocalRankings(
+                    (prev) =>
+                      prev?.map((entry) =>
+                        entry.rank === submitState.data.rank ? { ...entry, username } : entry
+                      ) ?? null
+                  );
+                  setInitialsSubmitted(true);
+                }}
                 colors={colors}
               />
-            )}
+              <Text style={[styles.rankingTitle, { color: colors.levelLabel }]}>ランキング</Text>
+              <RankingTableHeader colors={colors} showArrowColumn />
+            </View>
+
+            {/* スクロール可能エリア: データ行のみ。初期表示で自分の行を中央に */}
+            <ScrollView
+              ref={scrollRef}
+              style={styles.rankingScroll}
+              contentContainerStyle={styles.rankingScrollContent}
+              showsVerticalScrollIndicator={false}
+              onLayout={(e) => {
+                scrollViewHeightRef.current = e.nativeEvent.layout.height;
+              }}
+              onContentSizeChange={() => {
+                if (
+                  !hasScrolledRef.current &&
+                  submitState.data.rank != null &&
+                  scrollViewHeightRef.current > 0
+                ) {
+                  const targetY = Math.max(
+                    0,
+                    (submitState.data.rank - 1) * ROW_HEIGHT -
+                      scrollViewHeightRef.current / 2 +
+                      ROW_HEIGHT / 2
+                  );
+                  scrollRef.current?.scrollTo({ y: targetY, animated: false });
+                  hasScrolledRef.current = true;
+                }
+              }}
+            >
+              <RankingTableBody
+                rankings={localRankings.map((entry) =>
+                  entry.rank === submitState.data.rank
+                    ? { ...entry, username: username.padEnd(5, '_') }
+                    : entry
+                )}
+                myRank={submitState.data.rank}
+                colors={colors}
+                isEntering
+              />
+            </ScrollView>
           </>
         )}
-      </ScrollView>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          その他の状態: ローディング / エラー / ランクインなし / 入力完了後
+          ══════════════════════════════════════════════════════════════════ */}
+      {!(submitState.status === 'success' && submitState.data.ranked && !initialsSubmitted) && (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ─ ローディング ─ */}
+          {submitState.status === 'loading' && (
+            <View style={styles.loadingArea}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={[styles.loadingText, { color: colors.levelDescription }]}>
+                採点中...
+              </Text>
+            </View>
+          )}
+
+          {/* ─ エラー ─ */}
+          {submitState.status === 'error' && (
+            <View style={styles.errorArea}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={[styles.errorLabel, { color: colors.levelLabel }]}>
+                エラーが発生しました
+              </Text>
+              <Text style={[styles.errorMessage, { color: colors.levelDescription }]}>
+                {submitState.message}
+              </Text>
+            </View>
+          )}
+
+          {/* ─ 成功（ランクインなし または 入力完了後） ─ */}
+          {submitState.status === 'success' && (!submitState.data.ranked || initialsSubmitted) && (
+            <>
+              <ScoreSummary
+                correctCount={submitState.data.correct_count}
+                elapsedTime={submitState.data.elapsed_time}
+                colors={colors}
+              />
+              {submitState.data.ranked && localRankings && (
+                <RankingTable
+                  rankings={localRankings}
+                  myRank={submitState.data.rank}
+                  colors={colors}
+                />
+              )}
+            </>
+          )}
+        </ScrollView>
+      )}
 
       {/* ─ トップに戻るボタン ─ */}
       <View style={styles.buttonArea}>
         <AppButton
-          style={[styles.button, { backgroundColor: colors.accent }]}
+          style={[
+            styles.button,
+            { backgroundColor: isButtonDisabled ? colors.arrowButtonDisabled : colors.accent },
+          ]}
           onPress={() => router.replace('/')}
+          disabled={isButtonDisabled}
           accessibilityLabel="トップに戻る"
         >
-          <Text style={styles.buttonText}>トップに戻る</Text>
+          <Text style={[styles.buttonText, isButtonDisabled && styles.buttonTextDisabled]}>
+            トップに戻る
+          </Text>
         </AppButton>
       </View>
     </View>
@@ -174,10 +287,25 @@ const styles = StyleSheet.create({
     gap: 32,
   },
 
-  // タイトル
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
+  // イニシャル入力画面: 固定エリア（フォーム＋ランキングヘッダー）
+  fixedArea: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 8,
+    gap: 16,
+  },
+  rankingTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+  },
+
+  // イニシャル入力画面: スクロール可能ランキング行エリア
+  rankingScroll: {
+    flex: 1,
+  },
+  rankingScrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
   },
 
   // ローディング
@@ -251,5 +379,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '700',
+  },
+  buttonTextDisabled: {
+    opacity: 0.5,
   },
 });

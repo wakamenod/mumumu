@@ -291,6 +291,22 @@ describe('ResultScreen', () => {
     it('「トップに戻る」を押すと router.replace("/") が呼ばれる', async () => {
       await renderResultScreen();
 
+      // ランクイン時は END を押すまでボタンが disabled のため、
+      // まず5文字入力して END を押して initialsSubmitted 状態にする
+      await waitFor(() => {
+        expect(screen.getByLabelText('A')).toBeTruthy();
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('A'));
+        fireEvent.press(screen.getByLabelText('B'));
+        fireEvent.press(screen.getByLabelText('C'));
+        fireEvent.press(screen.getByLabelText('D'));
+        fireEvent.press(screen.getByLabelText('E'));
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('入力完了'));
+      });
+
       await act(async () => {
         fireEvent.press(screen.getByLabelText('トップに戻る'));
       });
@@ -371,12 +387,29 @@ describe('ResultScreen', () => {
     it('自分のランク行（rank: 3）のテキストに白色スタイルが適用される', async () => {
       await renderResultScreen();
 
+      // ランクイン時は InitialsEntryForm が表示される。
+      // 5文字入力して END を押すと initialsSubmitted になりランキングが表示される。
       await waitFor(() => {
-        expect(screen.getByText('-----')).toBeTruthy();
+        expect(screen.getByLabelText('A')).toBeTruthy();
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('A'));
+        fireEvent.press(screen.getByLabelText('B'));
+        fireEvent.press(screen.getByLabelText('C'));
+        fireEvent.press(screen.getByLabelText('D'));
+        fireEvent.press(screen.getByLabelText('E'));
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('入力完了'));
       });
 
-      // '-----' は rank: 3 の自分の行のユーザー名（isMe === true）
-      const myUsernameEl = screen.getByText('-----');
+      // END 後は ScoreSummary + RankingTable が表示される。
+      // 自分の行のユーザー名は入力した 'ABCDE' になる。
+      await waitFor(() => {
+        expect(screen.getByText('ABCDE')).toBeTruthy();
+      });
+
+      const myUsernameEl = screen.getByText('ABCDE');
       const flatStyle = StyleSheet.flatten(myUsernameEl.props.style);
       expect(flatStyle.color).toBe('#FFFFFF');
     });
@@ -413,9 +446,25 @@ describe('ResultScreen', () => {
     it('rankings が20件のとき全ユーザー名が表示される', async () => {
       await renderResultScreen();
 
+      // ランクイン時は InitialsEntryForm が表示される。
+      // 5文字入力して END を押すと initialsSubmitted になりランキングが表示される。
       await waitFor(() => {
-        // 先頭と末尾のユーザーが両方表示されていることを確認
-        expect(screen.getByText('User1')).toBeTruthy();
+        expect(screen.getByLabelText('A')).toBeTruthy();
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('A'));
+        fireEvent.press(screen.getByLabelText('B'));
+        fireEvent.press(screen.getByLabelText('C'));
+        fireEvent.press(screen.getByLabelText('D'));
+        fireEvent.press(screen.getByLabelText('E'));
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('入力完了'));
+      });
+
+      await waitFor(() => {
+        // 先頭は自分の行なので入力値 'ABCDE'、2位以降のユーザーを確認
+        expect(screen.getByText('ABCDE')).toBeTruthy();
         expect(screen.getByText('User20')).toBeTruthy();
       });
     });

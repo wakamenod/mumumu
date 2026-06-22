@@ -59,12 +59,13 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │       │   ├── constants.test.ts
 │       │   ├── DifficultySelectScreen.test.tsx
 │       │   ├── getRanking.test.ts        # getRankingFunction のユニットテスト
+│       │   ├── InitialsEntryForm.test.tsx # InitialsEntryForm コンポーネントのテスト
 │       │   ├── LevelStepper.test.tsx
 │       │   ├── MathDisplay.test.tsx
 │       │   ├── NumericKeypad.test.tsx
 │       │   ├── QuizScreen.test.tsx
 │       │   ├── RankingScreen.test.tsx    # ランキング画面の統合テスト
-│       │   ├── RankingTable.test.tsx     # RankingTable コンポーネントのテスト
+│       │   ├── RankingTable.test.tsx     # RankingTable / RankingTableHeader / RankingTableBody のテスト
 │       │   ├── ResultScreen.test.tsx
 │       │   └── submitScore.test.ts
 │       ├── api/            # Cloud Functions 呼び出し層
@@ -72,10 +73,11 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │       │   ├── getRanking.ts       # getRankingFunction 呼び出し
 │       │   └── submitScore.ts      # submitScoreFunction 呼び出し・RankingEntry 型定義
 │       ├── components/     # クイズ機能固有のUIコンポーネント
+│       │   ├── InitialsEntryForm.tsx # イニシャル入力フォーム（3行10列ボタングリッド）
 │       │   ├── LevelStepper.tsx
-│       │   ├── MathDisplay.tsx     # LaTeX 数式レンダリング
-│       │   ├── NumericKeypad.tsx   # カスタム数値キーパッド（正誤オーバーレイ内蔵）
-│       │   └── RankingTable.tsx    # ランキングテーブル（結果画面・ランキング画面で共用）
+│       │   ├── MathDisplay.tsx       # LaTeX 数式レンダリング
+│       │   ├── NumericKeypad.tsx     # カスタム数値キーパッド（正誤オーバーレイ内蔵）
+│       │   └── RankingTable.tsx      # RankingTableHeader / RankingTableBody / RankingTable を export
 │       ├── types.ts        # 型定義（DifficultyLevel など）
 │       ├── constants.ts    # ドメイン定数（DIFFICULTY_LEVELS など）
 │       └── index.ts        # 外部に公開するインターフェース（barrel export）

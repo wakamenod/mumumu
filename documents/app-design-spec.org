@@ -31,11 +31,16 @@
    =MathDisplay= コンポーネントが WebView を使わずネイティブで数式として表示する。
    回答ボタン押下後、入力表示エリアに正誤の ○/× がアニメーション演出付きで重なって表示される。
    20問すべてに回答すると結果画面へ自動遷移する。
-3. *結果画面*: =submitScoreFunction= のレスポンスをもとに正解数・経過時間を表示する。
-   ランクイン（=ranked: true=）の場合は上位20位分のランキングテーブルを合わせて表示する。
+3. *結果画面*: =submitScoreFunction= のレスポンスをもとに表示内容を切り替える。
+   - *ランクインしなかった場合*: 正解数・経過時間を表示する。
+   - *ランクインした場合（=ranked: true=）*:
+     正解数・経過時間は非表示とし、代わりに *イニシャル入力フォーム（=InitialsEntryForm=）* を
+     表示する。フォームはキーボードグリッド（3行10列）＋ランキングテーブルで構成される。
+     ランキングテーブルは固定ヘッダー＋スクロール可能ボディに分割して表示し、
+     自分のランク行が画面中央に来るよう初期スクロール位置を自動調整する。
+     ENDボタン押下後、正解数・経過時間と確定ユーザー名入り完全ランキングを表示する。
    ランキングのレスポンスが20件未満の場合、不足行はすべて「—」で埋めて常に20行表示する。
    自分のランク行は =accent= カラーでハイライト表示する。
-   （名前入力フォームは今後実装予定。）
 4. *ランキング画面*: タブバー右側（トロフィーアイコン）のタブで常時アクセス可能。
    =getRankingFunction= を呼び出してレベルごとのランキングを表示する。
    画面上部の横スクロールタブ（A〜M の13レベル）でレベルを切り替える（デフォルトは M = 小学1年生）。
@@ -150,7 +155,87 @@ Stack (app/_layout.tsx)
 <RankingTable rankings={rankings} colors={colors} />
 #+END_SRC
 
-** 4.5.2 二重送信防止（ランキング重複登録の防止）
+** 4.5.2 イニシャル入力フォーム仕様（ランクイン時）
+ランクイン（=ranked: true=）時の結果画面は、ENDボタン押下までを「イニシャル入力フェーズ」とし、
+以下の構成に切り替える。
+
+*** 4.5.2.1 画面レイアウト（イニシャル入力フェーズ）
+
+#+BEGIN_EXAMPLE
+┌─────────────────────────────────────┐
+│  固定: ENTER YOUR INITIALS           │
+│  固定: [A][B]...[J]                  │
+│  固定: [K][L]...[T]                  │  ← InitialsEntryForm（3行10列キーボード）
+│  固定: [U][V][W][X][Y][Z][-][←][END]│
+│  固定: ─────────────────────────    │
+│  固定: ランキング                     │
+│  固定: 順位 ユーザー名  正解  経過時間 │  ← RankingTableHeader（固定ヘッダー）
+├─────────────────────────────────────┤
+│  スクロール: 1   AAAAA    20   10.1秒 │
+│  スクロール: 2   ABC__    19   11.2秒 │  ← RankingTableBody（スクロール可能）
+│  スクロール: 3 ▶ _____    18   12.3秒 │  ← 自分の行（点滅矢印・ハイライト）
+│  スクロール: ...                       │    初期表示で画面中央付近にスクロール
+├─────────────────────────────────────┤
+│  固定: トップに戻る（グレー・非活性）  │
+└─────────────────────────────────────┘
+#+END_EXAMPLE
+
+*** 4.5.2.2 InitialsEntryForm コンポーネント仕様
+
+コンポーネント: =features/quiz/components/InitialsEntryForm.tsx=
+
+*ボタン配置（3行10列）:*
+| 行 | ボタン |
+|----+--------------------------------------|
+| 1  | A B C D E F G H I J |
+| 2  | K L M N O P Q R S T |
+| 3  | U V W X Y Z - ← [END（2マス分）] |
+
+*Props:*
+| Prop           | 型                       | 説明                                        |
+|----------------+--------------------------+---------------------------------------------|
+| =value=        | =string=                 | 現在の入力文字列（親が管理、最大5文字）     |
+| =onPressLetter= | =(char: string) => void= | A〜Z・ハイフンボタン押下時                  |
+| =onBackspace=  | =() => void=             | =←= ボタン押下時                           |
+| =onEnd=        | =() => void=             | ENDボタン押下時（value が5文字のときのみ発火） |
+| =colors=       | =ColorsType=             | カラートークン                              |
+
+*ボタンの活性・非活性ルール:*
+| ボタン | 無効になる条件 |
+|--------+----------------|
+| A〜Z・=−= | =value= が5文字（=isFull=） |
+| =←=    | =value= が0文字（=isEmpty=） |
+| END    | =value= が5文字未満 |
+
+*ユーザー名制約:*
+- 5文字固定（英大文字 A〜Z とハイフン =−= のみ）
+- Firestore への書き込みは =registerUsernameFunction= 経由（未実装・今後実装予定）
+
+*** 4.5.2.3 イニシャル入力フェーズ中のランキング表示
+
+ランキングボディ（=RankingTableBody=）は =isEntering={true}= で以下の挙動を取る:
+- 自分の行以外を =opacity: 0.25= で薄く表示し、自分の行を目立たせる
+- 自分の行の左端に点滅矢印（=▶=）を表示（react-native-reanimated の =withRepeat= で実装）
+- 自分のユーザー名セルには入力中の文字列をリアルタイム表示（未入力分は =_= でパディング）
+  例: =ABC= 入力中 → =ABC__=
+- ENDボタン押下後: =isEntering= が解除され、点滅矢印消去・薄色表示解除・確定ユーザー名表示
+
+=RankingTableHeader= は =showArrowColumn={true}= を指定することで、
+ボディの矢印列（幅16pt）に対応するスペーサーを左端に挿入し、列位置を揃える。
+
+*** 4.5.2.4 トップに戻るボタンの制御
+
+ENDボタン押下前（=initialsSubmitted === false=）は =AppButton= の =disabled= prop で
+「トップに戻る」ボタンを非活性化する（背景色 =arrowButtonDisabled=・テキスト opacity 0.5）。
+
+*** 4.5.2.5 スクロール初期位置の自動調整
+
+ランキングボディの =ScrollView= は以下のロジックで自分の行を画面中央付近にスクロールする:
+- =onLayout= でスクロール可能エリアの高さを =scrollViewHeightRef= に記録
+- =onContentSizeChange= でコンテンツ描画後に =scrollTo= を1回のみ実行（=hasScrolledRef= で制御）
+- スクロール量 =targetY = max(0, (myRank - 1) × ROW_HEIGHT − scrollViewHeight / 2 + ROW_HEIGHT / 2)=
+
+** 4.5.3 二重送信防止（ランキング重複登録の防止）
 クイズ終了後に =submitScoreFunction= が複数回呼ばれると、同一プレイヤーが1回の回答で
 複数回ランク登録できてしまうため、以下の2段階の対策を実施する。
 
@@ -356,6 +441,75 @@ const result = await getRanking({ level: "A" });
 | コード             | 発生条件                                    |
 |--------------------+---------------------------------------------|
 | =invalid-argument= | =level= が未指定・A〜M 以外・文字列以外     |
+
+** 9.2 submitScoreFunction（スコア送信・ランキング登録）
+
+クイズ終了後に全20問の回答リストとスタート時刻を送信し、サーバー側で採点・ランキング登録を行う。
+クライアント側ラッパー: =features/quiz/api/submitScore.ts= の =submitScore(...)= を使用する。
+
+*** 9.2.1 呼び出し方法
+
+#+BEGIN_SRC typescript
+const submitScore = httpsCallable(functions, "submitScoreFunction");
+const result = await submitScore({ level, answers, startedAt });
+#+END_SRC
+
+*** 9.2.2 リクエスト
+
+| フィールド   | 型                              | 必須 | 説明                                    |
+|--------------+---------------------------------+------+-----------------------------------------|
+| =level=      | =string=                        | ○    | レベル識別子（A〜M）                    |
+| =answers=    | ={ id: string; answer: string }[]= | ○    | 問題IDと生の解答文字列のペア配列（20件） |
+| =startedAt=  | =number=                        | ○    | クイズ開始時刻（Unix ミリ秒）           |
+
+*** 9.2.3 レスポンス
+
+#+BEGIN_SRC json
+{
+  "ranked": true,
+  "rank": 3,
+  "correct_count": 18,
+  "elapsed_time": 95.0,
+  "claimToken": "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx",
+  "rankings": [
+    { "rank": 1, "username": "Alice", "correct_count": 20, "elapsed_time": 60.0 },
+    { "rank": 2, "username": "Bob",   "correct_count": 19, "elapsed_time": 80.0 },
+    { "rank": 3, "username": "-----", "correct_count": 18, "elapsed_time": 95.0 }
+  ]
+}
+#+END_SRC
+
+| フィールド      | 型                  | 説明                                                                     |
+|-----------------+---------------------+--------------------------------------------------------------------------|
+| =ranked=        | =boolean=           | ランクインしたか否か                                                     |
+| =rank=          | =number \| null=    | 自分の順位。=ranked: false= のとき =null=                                |
+| =correct_count= | =number=            | 正解数                                                                   |
+| =elapsed_time=  | =number=            | 経過時間（秒）                                                           |
+| =claimToken=    | =string \| null=    | ランクイン時に発行される一時トークン（UUID v4）。TTL: 10分。ランクインなしは =null= |
+| =rankings=      | =RankingEntry[]=    | ランクイン時のみ最新ランキング上位20件。ランクインなしは =[]= を返す     |
+
+=claimToken= は =registerUsernameFunction=（未実装・今後実装予定）の呼び出し時に使用する
+一時認可トークンであり、ユーザー名登録後に Firestore から削除される。
+クライアントはこのトークンを =submitScoreFunction= 呼び出し後のセッション内のみ保持する。
+
+*** 9.2.4 エラーレスポンス
+
+| コード             | 発生条件                                                  |
+|--------------------+-----------------------------------------------------------|
+| =invalid-argument= | =level= 未指定・=answers= が配列以外・=startedAt= が数値以外 |
+| =failed-precondition= | =answers= が20件でない・解答リストと問題IDが不一致      |
+
+** 9.3 registerUsernameFunction（ユーザー名登録）— 未実装・今後実装予定
+
+=submitScoreFunction= が返す =claimToken= を使って、ランキング行にユーザー名を書き込む。
+=InitialsEntryForm= の ENDボタン押下時に呼び出す予定。
+
+| 項目           | 内容                                                         |
+|----------------+--------------------------------------------------------------|
+| 認可           | =claimToken=（UUID v4・TTL 10分）                           |
+| usernameルール | 英大文字 A〜Z およびハイフン =−= のみ・5文字固定            |
+| 成功時         | Firestore の =username= フィールドを更新・=claim_token= を削除 |
+| 失敗時         | トークン失効（10分超過）・不正文字・文字数違反 など          |
 
 * 10. 運用・コスト管理
 ** 10.1 コスト見込み

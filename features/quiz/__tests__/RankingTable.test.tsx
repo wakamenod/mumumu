@@ -12,7 +12,13 @@ import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import { RankingTable, padRankings, formatTime } from '@/features/quiz/components/RankingTable';
+import {
+  RankingTable,
+  RankingTableHeader,
+  RankingTableBody,
+  padRankings,
+  formatTime,
+} from '@/features/quiz/components/RankingTable';
 import type { RankingEntry } from '@/features/quiz/api/submitScore';
 import Colors from '@/constants/Colors';
 
@@ -208,6 +214,128 @@ describe('RankingTable', () => {
       const aliceEl = screen.getByText('Alice');
       const flatStyle = StyleSheet.flatten(aliceEl.props.style);
       expect(flatStyle.color).toBe('#FFFFFF');
+    });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+describe('RankingTableHeader', () => {
+  describe('showArrowColumn 未指定（デフォルト: false）', () => {
+    it('ヘッダー列ラベルが 4 つすべて表示される', async () => {
+      await render(<RankingTableHeader colors={COLORS} />);
+      expect(screen.getByText('順位')).toBeTruthy();
+      expect(screen.getByText('ユーザー名')).toBeTruthy();
+      expect(screen.getByText('正解数')).toBeTruthy();
+      expect(screen.getByText('経過時間')).toBeTruthy();
+    });
+  });
+
+  describe('showArrowColumn={true}', () => {
+    it('ヘッダー列ラベルが 4 つすべて表示される', async () => {
+      await render(<RankingTableHeader colors={COLORS} showArrowColumn />);
+      expect(screen.getByText('順位')).toBeTruthy();
+      expect(screen.getByText('ユーザー名')).toBeTruthy();
+      expect(screen.getByText('正解数')).toBeTruthy();
+      expect(screen.getByText('経過時間')).toBeTruthy();
+    });
+
+    it('showArrowColumn={false} と同じヘッダーラベルが表示される', async () => {
+      // showArrowColumn はスペーサーの有無のみに影響し、ラベル表示には影響しない
+      await render(<RankingTableHeader colors={COLORS} showArrowColumn />);
+      const labels = ['順位', 'ユーザー名', '正解数', '経過時間'];
+      for (const label of labels) {
+        expect(screen.getByText(label)).toBeTruthy();
+      }
+    });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+describe('RankingTableBody', () => {
+  // ──────────────────────────────────────────────────────────
+  describe('isEntering 未指定（デフォルト: false）', () => {
+    it('ユーザー名が表示される', async () => {
+      await render(<RankingTableBody rankings={MOCK_3_RANKINGS} colors={COLORS} />);
+      expect(screen.getByText('Alice')).toBeTruthy();
+      expect(screen.getByText('Bob')).toBeTruthy();
+    });
+
+    it('点滅矢印「▶」が表示されない', async () => {
+      await render(<RankingTableBody rankings={MOCK_3_RANKINGS} myRank={3} colors={COLORS} />);
+      expect(screen.queryByText('▶')).toBeNull();
+    });
+
+    it('他の行に opacity: 0.25 の dimmed スタイルが適用されない', async () => {
+      await render(<RankingTableBody rankings={MOCK_3_RANKINGS} myRank={3} colors={COLORS} />);
+      // Alice の行（非ハイライト行）が dimmed でないことを確認
+      const aliceEl = screen.getByText('Alice');
+      const rowEl = aliceEl.parent;
+      const flatStyle = StyleSheet.flatten(rowEl?.props.style);
+      expect(flatStyle?.opacity).not.toBe(0.25);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────
+  describe('isEntering={true}', () => {
+    it('自分の行（myRank 一致）に点滅矢印「▶」が表示される', async () => {
+      await render(
+        <RankingTableBody rankings={MOCK_3_RANKINGS} myRank={3} colors={COLORS} isEntering />
+      );
+      expect(screen.getByText('▶')).toBeTruthy();
+    });
+
+    it('自分以外の行に opacity: 0.25 の dimmed スタイルが適用される', async () => {
+      await render(
+        <RankingTableBody rankings={MOCK_3_RANKINGS} myRank={3} colors={COLORS} isEntering />
+      );
+      // Alice（rank: 1）の行は自分ではないので dimmed になる
+      const aliceEl = screen.getByText('Alice');
+      const rowEl = aliceEl.parent;
+      const flatStyle = StyleSheet.flatten(rowEl?.props.style);
+      expect(flatStyle?.opacity).toBe(0.25);
+    });
+
+    it('自分の行（myRank 一致）には dimmed スタイルが適用されない', async () => {
+      await render(
+        <RankingTableBody rankings={MOCK_3_RANKINGS} myRank={3} colors={COLORS} isEntering />
+      );
+      // rank: 3 の行（username: '-----'）は自分の行なので dimmed にならない
+      const myUsernameEl = screen.getByText('-----');
+      const rowEl = myUsernameEl.parent;
+      const flatStyle = StyleSheet.flatten(rowEl?.props.style);
+      expect(flatStyle?.opacity).not.toBe(0.25);
+    });
+
+    it('isEntering=true でも myRank 未指定なら矢印「▶」が表示されない', async () => {
+      await render(<RankingTableBody rankings={MOCK_3_RANKINGS} colors={COLORS} isEntering />);
+      // myRank が指定されていないので isMe = false → 矢印なし
+      expect(screen.queryByText('▶')).toBeNull();
+    });
+
+    it('isEntering=true でも myRank 未指定なら全行が dimmed になる', async () => {
+      await render(<RankingTableBody rankings={MOCK_3_RANKINGS} colors={COLORS} isEntering />);
+      // myRank なし: isMe は常に false → 全行 dimmed
+      const aliceEl = screen.getByText('Alice');
+      const rowEl = aliceEl.parent;
+      const flatStyle = StyleSheet.flatten(rowEl?.props.style);
+      expect(flatStyle?.opacity).toBe(0.25);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────
+  describe('myRank — ハイライト（RankingTableBody 単体）', () => {
+    it('myRank を指定した行のテキストが白色（#FFFFFF）になる', async () => {
+      await render(<RankingTableBody rankings={MOCK_3_RANKINGS} myRank={1} colors={COLORS} />);
+      const aliceEl = screen.getByText('Alice');
+      const flatStyle = StyleSheet.flatten(aliceEl.props.style);
+      expect(flatStyle.color).toBe('#FFFFFF');
+    });
+
+    it('myRank を指定しても他の行は白色にならない', async () => {
+      await render(<RankingTableBody rankings={MOCK_3_RANKINGS} myRank={1} colors={COLORS} />);
+      const bobEl = screen.getByText('Bob');
+      const flatStyle = StyleSheet.flatten(bobEl.props.style);
+      expect(flatStyle.color).not.toBe('#FFFFFF');
     });
   });
 });
