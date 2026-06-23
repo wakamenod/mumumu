@@ -135,17 +135,10 @@ export default function ResultScreen() {
                         ) ?? null
                     );
                     setInitialsSubmitted(true);
-                  } catch (err: unknown) {
-                    const code = (err as { code?: string }).code;
-                    const isCustomError =
-                      typeof code === 'string' &&
-                      code.startsWith('functions/') &&
-                      code !== 'functions/internal';
+                  } catch {
                     Alert.alert(
                       'ユーザー名の登録に失敗しました',
-                      isCustomError && err instanceof Error
-                        ? err.message
-                        : '通信環境を確認して再度お試しください。'
+                      '通信環境を確認して再度お試しください。'
                     );
                   } finally {
                     setIsRegistering(false);

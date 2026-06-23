@@ -600,26 +600,8 @@ describe('ResultScreen', () => {
       });
     });
 
-    it('HttpsError（functions/invalid-argument）のときサーバーのメッセージを表示する', async () => {
-      const firebaseError = new Error('ユーザー名は英大文字5文字で入力してください');
-      (firebaseError as unknown as { code: string }).code = 'functions/invalid-argument';
-      registerCallable.mockRejectedValueOnce(firebaseError);
-
-      await renderResultScreen();
-      await enterInitialsAndPressEnd();
-
-      await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(
-          'ユーザー名の登録に失敗しました',
-          'ユーザー名は英大文字5文字で入力してください'
-        );
-      });
-    });
-
-    it('functions/internal のときフォールバックメッセージを表示する', async () => {
-      const internalError = new Error('INTERNAL');
-      (internalError as unknown as { code: string }).code = 'functions/internal';
-      registerCallable.mockRejectedValueOnce(internalError);
+    it('registerUsernameApi が失敗したときフォールバックメッセージを表示する', async () => {
+      registerCallable.mockRejectedValueOnce(new Error('network error'));
 
       await renderResultScreen();
       await enterInitialsAndPressEnd();

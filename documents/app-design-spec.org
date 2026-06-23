@@ -540,22 +540,10 @@ const result = await submitScore({ level, answers, startedAt });
 *** 9.3.1 クライアント側エラーハンドリング
 
 ENDボタン押下後の =registerUsernameFunction= 呼び出しがエラーになった場合、
-エラーの種類に応じて =Alert.alert= の本文メッセージを切り替える。
+エラーの種類に関わらず固定メッセージを =Alert.alert= で表示する。
 
-| エラー種別                                     | =error.code=                    | Alert 本文                                     |
-|------------------------------------------------+---------------------------------+------------------------------------------------|
-| 開発者が =HttpsError= で設定したエラー          | =functions/xxx=（=internal= 以外）| =error.message=（サーバーが設定した日本語メッセージ） |
-| Cloud Functions 内の未キャッチ例外              | =functions/internal=            | =通信環境を確認して再度お試しください。=        |
-| ネットワークエラー・その他                      | =undefined= / その他           | =通信環境を確認して再度お試しください。=        |
-
-判定ロジック:
-#+BEGIN_SRC typescript
-const code = (err as { code?: string }).code;
-const isCustomError =
-  typeof code === 'string' &&
-  code.startsWith('functions/') &&
-  code !== 'functions/internal';
-#+END_SRC
+- タイトル: =ユーザー名の登録に失敗しました=
+- 本文: =通信環境を確認して再度お試しください。=
 
 * 10. 運用・コスト管理
 ** 10.1 コスト見込み

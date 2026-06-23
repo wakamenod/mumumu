@@ -176,9 +176,7 @@ describe('ResultScreen', () => {
     it('registerUsernameFunction 成功時に initialsSubmitted になり ScoreSummary が表示される', ...);
     it('registerUsernameFunction 失敗時はフォームが残りリトライできる', ...);
     it('registerUsernameFunction 通信中は END ボタンのテキストが「...」になる', ...);
-    it('HttpsError（functions/invalid-argument）のときサーバーのメッセージを表示する', ...);
-    it('functions/internal のときフォールバックメッセージを表示する', ...);
-    it('ネットワークエラーのときフォールバックメッセージを表示する', ...);
+    it('registerUsernameApi が失敗したときフォールバックメッセージを表示する', ...);
   });
 });
 #+END_SRC
