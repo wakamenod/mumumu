@@ -32,6 +32,8 @@ export interface InitialsEntryFormProps {
   onBackspace: () => void;
   /** END ボタンが押されたとき（value が5文字のときのみ呼ばれる） */
   onEnd: () => void;
+  /** 送信中フラグ。true のとき全ボタンを無効化する。 */
+  submitting?: boolean;
   colors: ColorsType;
 }
 
@@ -42,6 +44,7 @@ export function InitialsEntryForm({
   onPressLetter,
   onBackspace,
   onEnd,
+  submitting = false,
   colors,
 }: InitialsEntryFormProps) {
   const isFull = value.length >= USERNAME_LENGTH;
@@ -63,13 +66,13 @@ export function InitialsEntryForm({
                   <Pressable
                     key="END"
                     onPress={onEnd}
-                    disabled={!isFull}
+                    disabled={!isFull || submitting}
                     style={({ pressed }) => [
                       styles.keyButton,
                       styles.endButton,
                       {
-                        backgroundColor: isFull ? colors.accent : colors.cardBorder,
-                        opacity: pressed ? 0.7 : 1,
+                        backgroundColor: isFull && !submitting ? colors.accent : colors.cardBorder,
+                        opacity: pressed ? 0.7 : submitting ? 0.5 : 1,
                       },
                     ]}
                     accessibilityLabel="入力完了"
@@ -79,28 +82,31 @@ export function InitialsEntryForm({
                       style={[
                         styles.keyText,
                         styles.endText,
-                        { color: isFull ? colors.accentText : colors.levelDescription },
+                        {
+                          color:
+                            isFull && !submitting ? colors.accentText : colors.levelDescription,
+                        },
                       ]}
                     >
-                      END
+                      {submitting ? '...' : 'END'}
                     </Text>
                   </Pressable>
                 );
               }
 
               if (key === '←') {
-                // バックスペースボタン：入力が0文字のときは無効
+                // バックスペースボタン：入力が0文字または送信中のときは無効
                 return (
                   <Pressable
                     key="←"
                     onPress={onBackspace}
-                    disabled={isEmpty}
+                    disabled={isEmpty || submitting}
                     style={({ pressed }) => [
                       styles.keyButton,
                       {
                         backgroundColor: colors.cardBackground,
                         borderColor: colors.cardBorder,
-                        opacity: isEmpty ? 0.35 : pressed ? 0.6 : 1,
+                        opacity: isEmpty || submitting ? 0.35 : pressed ? 0.6 : 1,
                       },
                     ]}
                     accessibilityLabel="1文字削除"
@@ -111,18 +117,18 @@ export function InitialsEntryForm({
                 );
               }
 
-              // 通常の文字ボタン（A–Z, -）：5文字入力済みのときは無効
+              // 通常の文字ボタン（A–Z, -）：5文字入力済みまたは送信中のときは無効
               return (
                 <Pressable
                   key={key}
                   onPress={() => onPressLetter(key)}
-                  disabled={isFull}
+                  disabled={isFull || submitting}
                   style={({ pressed }) => [
                     styles.keyButton,
                     {
                       backgroundColor: colors.cardBackground,
                       borderColor: colors.cardBorder,
-                      opacity: isFull ? 0.35 : pressed ? 0.6 : 1,
+                      opacity: isFull || submitting ? 0.35 : pressed ? 0.6 : 1,
                     },
                   ]}
                   accessibilityLabel={key}

@@ -25,6 +25,7 @@ interface RenderOptions {
   onPressLetter?: jest.Mock;
   onBackspace?: jest.Mock;
   onEnd?: jest.Mock;
+  submitting?: boolean;
 }
 
 async function renderForm({
@@ -32,6 +33,7 @@ async function renderForm({
   onPressLetter = jest.fn(),
   onBackspace = jest.fn(),
   onEnd = jest.fn(),
+  submitting = false,
 }: RenderOptions = {}) {
   await act(async () => {
     render(
@@ -40,6 +42,7 @@ async function renderForm({
         onPressLetter={onPressLetter}
         onBackspace={onBackspace}
         onEnd={onEnd}
+        submitting={submitting}
         colors={COLORS}
       />
     );
@@ -253,6 +256,45 @@ describe('InitialsEntryForm', () => {
       expect(screen.getByLabelText('-')).toBeTruthy();
       expect(screen.getByLabelText('1文字削除')).toBeTruthy();
       expect(screen.getByLabelText('入力完了')).toBeTruthy();
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────
+  describe('submitting = true のとき（送信中）', () => {
+    it('文字ボタン（A）が無効になっている', async () => {
+      await renderForm({ value: 'ABC', submitting: true });
+      expect(screen.getByLabelText('A').props.accessibilityState?.disabled).toBe(true);
+    });
+
+    it('バックスペースボタンが無効になっている', async () => {
+      await renderForm({ value: 'ABC', submitting: true });
+      expect(screen.getByLabelText('1文字削除').props.accessibilityState?.disabled).toBe(true);
+    });
+
+    it('END ボタンが無効になっている（5文字入力済みでも）', async () => {
+      await renderForm({ value: 'ABCDE', submitting: true });
+      expect(screen.getByLabelText('入力完了').props.accessibilityState?.disabled).toBe(true);
+    });
+
+    it('END ボタンのテキストが「...」になっている', async () => {
+      await renderForm({ value: 'ABCDE', submitting: true });
+      expect(screen.getByText('...')).toBeTruthy();
+    });
+
+    it('submitting 中に文字ボタンを押しても onPressLetter が呼ばれない', async () => {
+      const { onPressLetter } = await renderForm({ value: 'ABC', submitting: true });
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('A'));
+      });
+      expect(onPressLetter).not.toHaveBeenCalled();
+    });
+
+    it('submitting 中に END を押しても onEnd が呼ばれない', async () => {
+      const { onEnd } = await renderForm({ value: 'ABCDE', submitting: true });
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('入力完了'));
+      });
+      expect(onEnd).not.toHaveBeenCalled();
     });
   });
 });

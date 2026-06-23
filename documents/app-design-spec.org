@@ -38,7 +38,9 @@
      表示する。フォームはキーボードグリッド（3行10列）＋ランキングテーブルで構成される。
      ランキングテーブルは固定ヘッダー＋スクロール可能ボディに分割して表示し、
      自分のランク行が画面中央に来るよう初期スクロール位置を自動調整する。
-     ENDボタン押下後、正解数・経過時間と確定ユーザー名入り完全ランキングを表示する。
+     ENDボタン押下時に =registerUsernameFunction= を非同期で呼び出し、成功した場合のみ
+     正解数・経過時間と確定ユーザー名入り完全ランキングを表示する。
+     失敗時はアラートで通知し、フォームはそのまま残るためリトライが可能。
    ランキングのレスポンスが20件未満の場合、不足行はすべて「—」で埋めて常に20行表示する。
    自分のランク行は =accent= カラーでハイライト表示する。
 4. *ランキング画面*: タブバー右側（トロフィーアイコン）のタブで常時アクセス可能。
@@ -192,24 +194,27 @@ Stack (app/_layout.tsx)
 | 3  | U V W X Y Z - ← [END（2マス分）] |
 
 *Props:*
-| Prop           | 型                       | 説明                                        |
-|----------------+--------------------------+---------------------------------------------|
-| =value=        | =string=                 | 現在の入力文字列（親が管理、最大5文字）     |
-| =onPressLetter= | =(char: string) => void= | A〜Z・ハイフンボタン押下時                  |
-| =onBackspace=  | =() => void=             | =←= ボタン押下時                           |
-| =onEnd=        | =() => void=             | ENDボタン押下時（value が5文字のときのみ発火） |
-| =colors=       | =ColorsType=             | カラートークン                              |
+| Prop           | 型                                  | 説明                                        |
+|----------------+-------------------------------------+---------------------------------------------|
+| =value=        | =string=                            | 現在の入力文字列（親が管理、最大5文字）     |
+| =onPressLetter= | =(char: string) => void=           | A〜Z・ハイフンボタン押下時                  |
+| =onBackspace=  | =() => void=                        | =←= ボタン押下時                           |
+| =onEnd=        | =() => void \vert Promise<void>=    | ENDボタン押下時（value が5文字のときのみ発火） |
+| =submitting=   | =boolean=（optional, default false） | 送信中フラグ。true のとき全ボタンを無効化   |
+| =colors=       | =ColorsType=                        | カラートークン                              |
 
 *ボタンの活性・非活性ルール:*
-| ボタン | 無効になる条件 |
-|--------+----------------|
-| A〜Z・=−= | =value= が5文字（=isFull=） |
-| =←=    | =value= が0文字（=isEmpty=） |
-| END    | =value= が5文字未満 |
+| ボタン     | 無効になる条件                                       |
+|------------+------------------------------------------------------|
+| A〜Z・=−= | =isFull= または =submitting=                         |
+| =←=       | =isEmpty= または =submitting=                        |
+| END        | =value= が5文字未満 または =submitting=              |
+
+=submitting= が =true= のとき、END ボタンのテキストは =END= → =...= に変わり通信中であることを示す。
 
 *ユーザー名制約:*
 - 5文字固定（英大文字 A〜Z とハイフン =−= のみ）
-- Firestore への書き込みは =registerUsernameFunction= 経由（未実装・今後実装予定）
+- Firestore への書き込みは =registerUsernameFunction= 経由
 
 *** 4.5.2.3 イニシャル入力フェーズ中のランキング表示
 
@@ -218,7 +223,10 @@ Stack (app/_layout.tsx)
 - 自分の行の左端に点滅矢印（=▶=）を表示（react-native-reanimated の =withRepeat= で実装）
 - 自分のユーザー名セルには入力中の文字列をリアルタイム表示（未入力分は =_= でパディング）
   例: =ABC= 入力中 → =ABC__=
-- ENDボタン押下後: =isEntering= が解除され、点滅矢印消去・薄色表示解除・確定ユーザー名表示
+- ENDボタン押下後: =registerUsernameFunction= を =await= で呼び出す。
+  通信中は =submitting={true}= により全ボタンが無効化される。
+  成功時: =isEntering= が解除され、点滅矢印消去・薄色表示解除・確定ユーザー名表示。
+  失敗時: =Alert.alert= でエラーを通知し、フォームはそのまま残る（リトライ可能）。
 
 =RankingTableHeader= は =showArrowColumn={true}= を指定することで、
 ボディの矢印列（幅16pt）に対応するスペーサーを左端に挿入し、列位置を揃える。
@@ -245,6 +253,7 @@ ENDボタン押下前（=initialsSubmitted === false=）は =AppButton= の =dis
 | =hasNavigatedToResultRef= | =app/quiz.tsx=           | スワイプバック後または再押下による二重 =router.push=                 |
 | =AppButton= スロットル   | =components/AppButton.tsx= | アプリ全体のボタン連打（500ms 以内の再タップをスロットルで無効化）  |
 | =isSubmittingRef=        | =app/quiz.tsx=            | 回答処理中（crypto 非同期 + 900ms 待機中）の回答ボタン再押下         |
+| =isRegistering= + =submitting= | =app/result.tsx= / =InitialsEntryForm= | =registerUsernameFunction= 通信中の END ボタン・全キー再押下 |
 
 =hasNavigatedToResultRef= は =useRef(false)= で管理する。
 =setTimeout= コールバック内で =isLastQuestion= のとき、フラグが =true= なら即 =return=、
@@ -383,7 +392,7 @@ runTransaction(db, async (t) => {
   6. ドキュメントを 1 write で上書き
 })
 // 同時書き込み競合時は Firestore が自動リトライ → 整合性保証
-// claim_token は registerUsernameFunction 呼び出し後に削除される（TTL: 10分）
+// claim_token は registerUsernameFunction 呼び出し後に削除される
 #+END_EXAMPLE
 
 *** ランクイン判定条件（※）
@@ -485,10 +494,10 @@ const result = await submitScore({ level, answers, startedAt });
 | =rank=          | =number \| null=    | 自分の順位。=ranked: false= のとき =null=                                |
 | =correct_count= | =number=            | 正解数                                                                   |
 | =elapsed_time=  | =number=            | 経過時間（秒）                                                           |
-| =claimToken=    | =string \| null=    | ランクイン時に発行される一時トークン（UUID v4）。TTL: 10分。ランクインなしは =null= |
+| =claimToken=    | =string \| null=    | ランクイン時に発行される一時トークン（UUID v4）。ランクインなしは =null=            |
 | =rankings=      | =RankingEntry[]=    | ランクイン時のみ最新ランキング上位20件。ランクインなしは =[]= を返す     |
 
-=claimToken= は =registerUsernameFunction=（未実装・今後実装予定）の呼び出し時に使用する
+=claimToken= は =registerUsernameFunction= の呼び出し時に使用する
 一時認可トークンであり、ユーザー名登録後に Firestore から削除される。
 クライアントはこのトークンを =submitScoreFunction= 呼び出し後のセッション内のみ保持する。
 
@@ -499,17 +508,54 @@ const result = await submitScore({ level, answers, startedAt });
 | =invalid-argument= | =level= 未指定・=answers= が配列以外・=startedAt= が数値以外 |
 | =failed-precondition= | =answers= が7件でない・解答リストと問題IDが不一致       |
 
-** 9.3 registerUsernameFunction（ユーザー名登録）— 未実装・今後実装予定
+** 9.3 registerUsernameFunction（ユーザー名登録）
 
 =submitScoreFunction= が返す =claimToken= を使って、ランキング行にユーザー名を書き込む。
-=InitialsEntryForm= の ENDボタン押下時に呼び出す予定。
+=InitialsEntryForm= の ENDボタン押下時に呼び出す。
+クライアント側ラッパー: =features/quiz/api/registerUsername.ts= の =registerUsername(level, claimToken, username)= を使用する。
 
-| 項目           | 内容                                                         |
-|----------------+--------------------------------------------------------------|
-| 認可           | =claimToken=（UUID v4・TTL 10分）                           |
-| usernameルール | 英大文字 A〜Z およびハイフン =−= のみ・5文字固定            |
-| 成功時         | Firestore の =username= フィールドを更新・=claim_token= を削除 |
-| 失敗時         | トークン失効（10分超過）・不正文字・文字数違反 など          |
+*** 9.3.0 リクエスト
+
+| フィールド   | 型       | 必須 | 説明                                        |
+|--------------+----------+------+---------------------------------------------|
+| =level=      | =string= | ○    | クイズのレベル識別子（A〜M）                |
+| =claimToken= | =string= | ○    | =submitScoreFunction= が返した UUID v4      |
+| =username=   | =string= | ○    | 登録するユーザー名（5文字・英大文字 A〜Z・ハイフン） |
+
+*** 9.3.0 レスポンス
+
+| フィールド  | 型        | 説明                           |
+|-------------+-----------+--------------------------------|
+| =success=   | =boolean= | 常に =true=（エラー時は例外）  |
+| =rank=      | =number=  | 登録後の確定順位（1〜20）      |
+| =username=  | =string=  | 登録されたユーザー名           |
+
+*** 9.3.0 エラーレスポンス
+
+| コード              | 発生条件                                                                  |
+|---------------------+---------------------------------------------------------------------------|
+| =invalid-argument=  | =level= が A〜M 以外 / =claimToken= が UUID 形式でない / =username= がバリデーション違反 |
+| =not-found=         | =claimToken= に一致するエントリが存在しない（無効・既使用）               |
+
+*** 9.3.1 クライアント側エラーハンドリング
+
+ENDボタン押下後の =registerUsernameFunction= 呼び出しがエラーになった場合、
+エラーの種類に応じて =Alert.alert= の本文メッセージを切り替える。
+
+| エラー種別                                     | =error.code=                    | Alert 本文                                     |
+|------------------------------------------------+---------------------------------+------------------------------------------------|
+| 開発者が =HttpsError= で設定したエラー          | =functions/xxx=（=internal= 以外）| =error.message=（サーバーが設定した日本語メッセージ） |
+| Cloud Functions 内の未キャッチ例外              | =functions/internal=            | =通信環境を確認して再度お試しください。=        |
+| ネットワークエラー・その他                      | =undefined= / その他           | =通信環境を確認して再度お試しください。=        |
+
+判定ロジック:
+#+BEGIN_SRC typescript
+const code = (err as { code?: string }).code;
+const isCustomError =
+  typeof code === 'string' &&
+  code.startsWith('functions/') &&
+  code !== 'functions/internal';
+#+END_SRC
 
 * 10. 運用・コスト管理
 ** 10.1 コスト見込み

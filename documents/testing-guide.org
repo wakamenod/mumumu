@@ -122,10 +122,12 @@ features/quiz/
 │   ├── NumericKeypad.tsx
 │   └── RankingTable.tsx
 ├── api/
+│   ├── registerUsername.ts
 │   └── submitScore.ts
 └── __tests__/
     ├── NumericKeypad.test.tsx
     ├── RankingTable.test.tsx
+    ├── registerUsername.test.ts
     └── submitScore.test.ts
 #+END_SRC
 
@@ -142,6 +144,9 @@ features/quiz/
  *   - result.tsx が submitScoreFunction を正しく呼び出すことを検証する。
  *   - loading / success / error の3状態それぞれの表示を確認する。
  *   - ranked: true のとき正解数・経過時間＋ランキングテーブルが表示されることを確認する。
+ *   - registerUsernameFunction の呼び出し（END ボタン押下時）を検証する。
+ *   - registerUsernameFunction 成功→スコアサマリー遷移、失敗→Alert 表示・リトライ可能を確認する。
+ *   - submitting 状態（isRegistering）での UI 変化（END ボタン "..." 表示、全ボタン無効化）を確認する。
  */
 #+END_SRC
 
@@ -164,6 +169,16 @@ describe('ResultScreen', () => {
 
   describe('エラー状態', () => {
     it('callable が Error を throw したとき「エラーが発生しました」が表示される', async () => { ... });
+  });
+
+  describe('registerUsernameFunction の呼び出し', () => {
+    it('END ボタン押下で registerUsernameFunction が claimToken と username 付きで呼ばれる', ...);
+    it('registerUsernameFunction 成功時に initialsSubmitted になり ScoreSummary が表示される', ...);
+    it('registerUsernameFunction 失敗時はフォームが残りリトライできる', ...);
+    it('registerUsernameFunction 通信中は END ボタンのテキストが「...」になる', ...);
+    it('HttpsError（functions/invalid-argument）のときサーバーのメッセージを表示する', ...);
+    it('functions/internal のときフォールバックメッセージを表示する', ...);
+    it('ネットワークエラーのときフォールバックメッセージを表示する', ...);
   });
 });
 #+END_SRC
@@ -219,6 +234,34 @@ beforeEach(() => {
   callable.mockClear();
   callable.mockResolvedValue({ data: MOCK_RESPONSE });
 });
+#+END_SRC
+
+*** 複数の Cloud Functions を呼び出す画面のモック
+
+=result.tsx= のように =submitScoreFunction= と =registerUsernameFunction= を両方呼ぶ場合、
+関数名に応じて異なる callable を返すモックを使用する。
+
+#+BEGIN_SRC typescript
+jest.mock('@/lib/firebase', () => {
+  const submitCallable = jest.fn();
+  const registerCallable = jest.fn();
+  return {
+    functions: {
+      httpsCallable: jest.fn((name: string) => {
+        if (name === 'registerUsernameFunction') return registerCallable;
+        return submitCallable;
+      }),
+      useEmulator: jest.fn(),
+    },
+    firebase: {},
+    __callable: submitCallable,
+    __registerCallable: registerCallable,
+  };
+});
+
+const firebaseMock = require('@/lib/firebase');
+const callable: jest.Mock = firebaseMock.__callable;             // submitScore 用
+const registerCallable: jest.Mock = firebaseMock.__registerCallable; // registerUsername 用
 #+END_SRC
 
 ** 4.3 =__mocks__= ディレクトリは使用しない

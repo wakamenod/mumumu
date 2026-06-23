@@ -66,11 +66,13 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │       │   ├── QuizScreen.test.tsx
 │       │   ├── RankingScreen.test.tsx    # ランキング画面の統合テスト
 │       │   ├── RankingTable.test.tsx     # RankingTable / RankingTableHeader / RankingTableBody のテスト
+│       │   ├── registerUsername.test.ts  # registerUsernameFunction のユニットテスト
 │       │   ├── ResultScreen.test.tsx
 │       │   └── submitScore.test.ts
 │       ├── api/            # Cloud Functions 呼び出し層
 │       │   ├── getQuiz.ts          # getQuizFunction 呼び出し
 │       │   ├── getRanking.ts       # getRankingFunction 呼び出し
+│       │   ├── registerUsername.ts  # registerUsernameFunction 呼び出し
 │       │   └── submitScore.ts      # submitScoreFunction 呼び出し・RankingEntry 型定義
 │       ├── components/     # クイズ機能固有のUIコンポーネント
 │       │   ├── InitialsEntryForm.tsx # イニシャル入力フォーム（3行10列ボタングリッド）

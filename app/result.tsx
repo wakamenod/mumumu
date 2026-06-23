@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import {
 
 import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
+import { registerUsername as registerUsernameApi } from '@/features/quiz/api/registerUsername';
 import { submitScore } from '@/features/quiz/api/submitScore';
 import type {
   AnswerEntry,
@@ -50,6 +52,8 @@ export default function ResultScreen() {
   const [username, setUsername] = useState<string>('');
   /** END ボタンが押されて入力が完了したか */
   const [initialsSubmitted, setInitialsSubmitted] = useState<boolean>(false);
+  /** registerUsernameFunction の通信中フラグ */
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
   /** ランキング（username 更新をローカルに反映するためのコピー） */
   const [localRankings, setLocalRankings] = useState<RankingEntry[] | null>(null);
 
@@ -118,15 +122,36 @@ export default function ResultScreen() {
                   setUsername((prev) => (prev.length < 5 ? prev + char : prev))
                 }
                 onBackspace={() => setUsername((prev) => prev.slice(0, -1))}
-                onEnd={() => {
-                  setLocalRankings(
-                    (prev) =>
-                      prev?.map((entry) =>
-                        entry.rank === submitState.data.rank ? { ...entry, username } : entry
-                      ) ?? null
-                  );
-                  setInitialsSubmitted(true);
+                onEnd={async () => {
+                  if (!submitState.data.claimToken) return;
+
+                  setIsRegistering(true);
+                  try {
+                    await registerUsernameApi(levelId ?? '', submitState.data.claimToken, username);
+                    setLocalRankings(
+                      (prev) =>
+                        prev?.map((entry) =>
+                          entry.rank === submitState.data.rank ? { ...entry, username } : entry
+                        ) ?? null
+                    );
+                    setInitialsSubmitted(true);
+                  } catch (err: unknown) {
+                    const code = (err as { code?: string }).code;
+                    const isCustomError =
+                      typeof code === 'string' &&
+                      code.startsWith('functions/') &&
+                      code !== 'functions/internal';
+                    Alert.alert(
+                      'ユーザー名の登録に失敗しました',
+                      isCustomError && err instanceof Error
+                        ? err.message
+                        : '通信環境を確認して再度お試しください。'
+                    );
+                  } finally {
+                    setIsRegistering(false);
+                  }
                 }}
+                submitting={isRegistering}
                 colors={colors}
               />
               <Text style={[styles.rankingTitle, { color: colors.levelLabel }]}>ランキング</Text>

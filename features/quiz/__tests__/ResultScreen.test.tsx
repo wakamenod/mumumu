@@ -12,21 +12,26 @@
 
 // ─── jest.mock はファイル最上部に記述（hoisting により import より先に評価される） ───
 jest.mock('@/lib/firebase', () => {
-  const callable = jest.fn();
+  const submitCallable = jest.fn();
+  const registerCallable = jest.fn();
   return {
     functions: {
-      httpsCallable: jest.fn(() => callable),
+      httpsCallable: jest.fn((name: string) => {
+        if (name === 'registerUsernameFunction') return registerCallable;
+        return submitCallable;
+      }),
       useEmulator: jest.fn(),
     },
     firebase: {},
-    __callable: callable,
+    __callable: submitCallable,
+    __registerCallable: registerCallable,
   };
 });
 
 /* eslint-disable import/first */
 import React from 'react';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import ResultScreen from '@/app/result';
@@ -36,6 +41,7 @@ import ResultScreen from '@/app/result';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const firebaseMock = require('@/lib/firebase');
 const callable: jest.Mock = firebaseMock.__callable;
+const registerCallable: jest.Mock = firebaseMock.__registerCallable;
 
 // ─── テスト用ダミーデータ ─────────────────────────────────────
 
@@ -117,14 +123,19 @@ async function renderResultScreen(params = DEFAULT_PARAMS) {
 describe('ResultScreen', () => {
   let mockReplace: jest.Mock;
 
+  let alertSpy: jest.SpyInstance;
+
   beforeEach(() => {
     callable.mockClear();
+    registerCallable.mockClear();
+    registerCallable.mockResolvedValue({ data: { success: true, rank: 3, username: 'ABCDE' } });
     mockReplace = jest.fn();
     (useRouter as jest.Mock).mockReturnValue({
       push: jest.fn(),
       replace: mockReplace,
       back: jest.fn(),
     });
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
   afterEach(async () => {
@@ -133,6 +144,7 @@ describe('ResultScreen', () => {
     await cleanup();
     loadingAbortController?.abort();
     loadingAbortController = null;
+    alertSpy.mockRestore();
   });
 
   // ──────────────────────────────────────────────────────────
@@ -473,6 +485,176 @@ describe('ResultScreen', () => {
       await waitFor(() => {
         expect(screen.getByText('100.0秒')).toBeTruthy();
       });
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────
+  describe('registerUsernameFunction の呼び出し', () => {
+    beforeEach(() => {
+      callable.mockResolvedValue({ data: MOCK_RESPONSE_RANKED });
+    });
+
+    /** 5文字入力して END を押す共通ヘルパー */
+    async function enterInitialsAndPressEnd() {
+      await waitFor(() => {
+        expect(screen.getByLabelText('A')).toBeTruthy();
+      });
+      await fireEvent.press(screen.getByLabelText('A'));
+      await fireEvent.press(screen.getByLabelText('B'));
+      await fireEvent.press(screen.getByLabelText('C'));
+      await fireEvent.press(screen.getByLabelText('D'));
+      await fireEvent.press(screen.getByLabelText('E'));
+
+      await fireEvent.press(screen.getByLabelText('入力完了'));
+    }
+
+    it('END ボタン押下で registerUsernameFunction が claimToken と username 付きで呼ばれる', async () => {
+      await renderResultScreen();
+      await enterInitialsAndPressEnd();
+
+      await waitFor(() => {
+        expect(registerCallable).toHaveBeenCalledTimes(1);
+        expect(registerCallable).toHaveBeenCalledWith({
+          level: 'A',
+          claimToken: MOCK_RESPONSE_RANKED.claimToken,
+          username: 'ABCDE',
+        });
+      });
+    });
+
+    it('registerUsernameFunction 成功時に initialsSubmitted になり ScoreSummary が表示される', async () => {
+      await renderResultScreen();
+      await enterInitialsAndPressEnd();
+
+      // 成功後は ScoreSummary + RankingTable が表示される
+      await waitFor(() => {
+        expect(screen.getByText('ABCDE')).toBeTruthy();
+      });
+
+      await fireEvent.press(screen.getByLabelText('トップに戻る'));
+      expect(mockReplace).toHaveBeenCalledWith('/');
+    });
+
+    it('registerUsernameFunction 失敗時はフォームが残りリトライできる', async () => {
+      // 1回目は失敗
+      registerCallable.mockRejectedValueOnce(new Error('deadline-exceeded'));
+
+      await renderResultScreen();
+      await enterInitialsAndPressEnd();
+
+      // フォームが残っている（initialsSubmitted にならない）
+      await waitFor(() => {
+        expect(screen.getByText('ENTER YOUR INITIALS')).toBeTruthy();
+      });
+
+      // 2回目は成功するようにモックを戻す
+      registerCallable.mockResolvedValueOnce({
+        data: { success: true, rank: 3, username: 'ABCDE' },
+      });
+
+      // リトライ: END をもう一度押す
+      await fireEvent.press(screen.getByLabelText('入力完了'));
+
+      // 成功後は ScoreSummary が表示される
+      await waitFor(() => {
+        expect(screen.getByText('ABCDE')).toBeTruthy();
+      });
+
+      expect(registerCallable).toHaveBeenCalledTimes(2);
+    });
+
+    it('registerUsernameFunction 通信中は END ボタンのテキストが「...」になる', async () => {
+      // resolve を手動制御する
+      let resolveRegister!: (value: unknown) => void;
+      registerCallable.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveRegister = resolve;
+        })
+      );
+
+      await renderResultScreen();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('A')).toBeTruthy();
+      });
+      await fireEvent.press(screen.getByLabelText('A'));
+      await fireEvent.press(screen.getByLabelText('B'));
+      await fireEvent.press(screen.getByLabelText('C'));
+      await fireEvent.press(screen.getByLabelText('D'));
+      await fireEvent.press(screen.getByLabelText('E'));
+
+      // END を押す前は END テキスト
+      expect(screen.queryByText('...')).toBeNull();
+
+      // END を押す（registerUsername が pending 状態になる）
+      fireEvent.press(screen.getByLabelText('入力完了'));
+
+      // 通信中: END ボタンのテキストが「...」に変わる
+      await waitFor(() => {
+        expect(screen.getByText('...')).toBeTruthy();
+      });
+
+      // resolve して通信完了させ、テスト後のクリーンアップ問題を防ぐ
+      await act(async () => {
+        resolveRegister({ data: { success: true, rank: 3, username: 'ABCDE' } });
+      });
+    });
+
+    it('HttpsError（functions/invalid-argument）のときサーバーのメッセージを表示する', async () => {
+      const firebaseError = new Error('ユーザー名は英大文字5文字で入力してください');
+      (firebaseError as unknown as { code: string }).code = 'functions/invalid-argument';
+      registerCallable.mockRejectedValueOnce(firebaseError);
+
+      await renderResultScreen();
+      await enterInitialsAndPressEnd();
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          'ユーザー名の登録に失敗しました',
+          'ユーザー名は英大文字5文字で入力してください'
+        );
+      });
+    });
+
+    it('functions/internal のときフォールバックメッセージを表示する', async () => {
+      const internalError = new Error('INTERNAL');
+      (internalError as unknown as { code: string }).code = 'functions/internal';
+      registerCallable.mockRejectedValueOnce(internalError);
+
+      await renderResultScreen();
+      await enterInitialsAndPressEnd();
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          'ユーザー名の登録に失敗しました',
+          '通信環境を確認して再度お試しください。'
+        );
+      });
+    });
+
+    it('ネットワークエラーのときフォールバックメッセージを表示する', async () => {
+      registerCallable.mockRejectedValueOnce(new TypeError('Network request failed'));
+
+      await renderResultScreen();
+      await enterInitialsAndPressEnd();
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          'ユーザー名の登録に失敗しました',
+          '通信環境を確認して再度お試しください。'
+        );
+      });
+    });
+
+    it('ranked: false のときは registerUsernameFunction が呼ばれない', async () => {
+      callable.mockResolvedValue({ data: MOCK_RESPONSE_NOT_RANKED });
+      await renderResultScreen();
+
+      await waitFor(() => {
+        expect(screen.getByText('正解数')).toBeTruthy();
+      });
+
+      expect(registerCallable).not.toHaveBeenCalled();
     });
   });
 });
