@@ -107,4 +107,4 @@ export const DIFFICULTY_LEVELS: DifficultyLevel[] = [
   },
 ];
 
-export const TOTAL_QUESTIONS = 20;
+export const TOTAL_QUESTIONS = 7;

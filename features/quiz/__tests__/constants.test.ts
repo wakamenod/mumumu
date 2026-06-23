@@ -72,7 +72,7 @@ describe('DIFFICULTY_LEVELS', () => {
 });
 
 describe('TOTAL_QUESTIONS', () => {
-  it('20問である', () => {
-    expect(TOTAL_QUESTIONS).toBe(20);
+  it('7問である', () => {
+    expect(TOTAL_QUESTIONS).toBe(7);
   });
 });

@@ -36,7 +36,7 @@ const callable: jest.Mock = firebaseMock.__callable;
 
 // ─── テスト用ダミーデータ ─────────────────────────────────────
 
-const MOCK_ANSWERS: AnswerEntry[] = Array.from({ length: 20 }, (_, i) => ({
+const MOCK_ANSWERS: AnswerEntry[] = Array.from({ length: 7 }, (_, i) => ({
   id: `q${i + 1}`,
   answer: String(i + 1),
 }));

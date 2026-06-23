@@ -33,8 +33,8 @@ const callable: jest.Mock = firebaseMock.__callable;
 // ─── テスト用ダミーデータ ─────────────────────────────────────
 
 const MOCK_RANKINGS: RankingEntry[] = [
-  { rank: 1, username: 'Alice', correct_count: 20, elapsed_time: 30.1 },
-  { rank: 2, username: 'Bob', correct_count: 20, elapsed_time: 35.2 },
+  { rank: 1, username: 'Alice', correct_count: 7, elapsed_time: 30.1 },
+  { rank: 2, username: 'Bob', correct_count: 7, elapsed_time: 35.2 },
   { rank: 3, username: '-----', correct_count: 18, elapsed_time: 52.4 },
 ];
 
@@ -96,20 +96,20 @@ describe('getRanking', () => {
       expect(Array.isArray(result)).toBe(true);
     });
 
-    it('rankings が20件フルのとき20件をそのまま返す', async () => {
-      const full = Array.from({ length: 20 }, (_, i) => ({
+    it('rankings が7件フルのとき7件をそのまま返す', async () => {
+      const full = Array.from({ length: 7 }, (_, i) => ({
         rank: i + 1,
         username: `User${i + 1}`,
-        correct_count: 20 - i,
+        correct_count: 7 - i,
         elapsed_time: 30.0 + i * 5,
       }));
       callable.mockResolvedValue({ data: { rankings: full } });
 
       const result = await getRanking('B');
 
-      expect(result).toHaveLength(20);
+      expect(result).toHaveLength(7);
       expect(result[0].rank).toBe(1);
-      expect(result[19].rank).toBe(20);
+      expect(result[6].rank).toBe(7);
     });
   });
 
