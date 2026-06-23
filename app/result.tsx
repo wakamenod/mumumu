@@ -100,9 +100,10 @@ export default function ResultScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** END が押されるまでトップに戻るボタンを非活性にする */
+  /** ローディング中、または END が押されるまでトップに戻るボタンを非活性にする */
   const isButtonDisabled =
-    submitState.status === 'success' && submitState.data.ranked && !initialsSubmitted;
+    submitState.status === 'loading' ||
+    (submitState.status === 'success' && submitState.data.ranked && !initialsSubmitted);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.screenBackground }]}>
