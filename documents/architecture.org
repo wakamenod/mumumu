@@ -109,39 +109,7 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 
 * 7. テスト戦略
 
-** 7.1 テストピラミッド
-テスタビリティを最大化するため、以下の3層構造を採用する。
-
-#+BEGIN_SRC text
-        ▲ Integration Tests  （少数・画面をまたぐ操作フローを検証）
-       ▲▲▲ Component Tests   （中程度・ユーザー操作と振る舞いを検証）
-    ▲▲▲▲▲▲▲ Unit Tests       （多数・高速・純粋なドメインロジック）
-#+END_SRC
-
-| 層          | 対象                          | ツール                        |
-|-------------+-------------------------------+-------------------------------|
-| Unit        | types.ts / constants.ts など  | Jest（React 不要・超高速）    |
-| Component   | LevelStepper など             | @testing-library/react-native |
-| Integration | 画面遷移・router.push の検証   | @testing-library/react-native |
-
-** 7.2 テスタビリティ原則
-1. *実装詳細をテストしない* — アニメーションの内部状態（=translateX.value= など）は検証しない。「ユーザーが見て操作できること」を軸にする。
-2. *=getByRole= / =getByLabelText= ファースト* — アクセシビリティ属性で要素を特定し、DOM 構造変更に強いテストにする。=getByTestId= は最終手段。
-3. *アニメーションはモック* — Reanimated の =setUpTests()= でモック化し、アニメーション完了を待たずに振る舞いをテストする。
-4. *ロジックをアニメーションから分離* — 状態更新（=onIndexChange= 等）をアニメーションコールバックの外で先に呼ぶことで、テスト環境でも確実に動作させる。
-5. *CI に統合* — =just check= にテストを組み込み、リグレッションを自動検知する。
-
-** 7.3 テスト環境セットアップ
-- *=jest.setup.ts=*: テストスイート前に実行される初期化ファイル。以下をモック化する。
-  - =react-native-reanimated=: =setUpTests()= でアニメーションを同期的な実装に差し替え
-  - =expo-router=: =router.push= / =useLocalSearchParams= を Jest の spy に差し替え
-  - =expo-font= / =expo-splash-screen=: ネイティブ依存を排除
-  - =react-native-safe-area-context=: =SafeAreaView= を =View= ラッパーに差し替え
-- *Jest 設定（package.json）*:
-  - =moduleNameMapper=: =@/*= エイリアスをプロジェクトルートに解決
-  - =transformIgnorePatterns=: reanimated / worklets を Jest の transform 対象に含める
-  - =setupFilesAfterEnv=: =jest.setup.ts= を指定
-  - =collectCoverageFrom=: =features/=, =app/=, =components/= を対象にカバレッジ計測
+テスト戦略・記述規約・実践パターンの詳細は [[file:testing-guide.org][testing-guide.org]] を参照のこと。
 
 * 8. LaTeX レンダリング
 

@@ -25,7 +25,7 @@ jest.mock('@/lib/firebase', () => {
 
 /* eslint-disable import/first */
 import React from 'react';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -109,10 +109,7 @@ function setupLoadingResponse() {
 /** ResultScreen を render する共通ヘルパー */
 async function renderResultScreen(params = DEFAULT_PARAMS) {
   (useLocalSearchParams as jest.Mock).mockReturnValue(params);
-
-  await act(async () => {
-    render(<ResultScreen />);
-  });
+  await render(<ResultScreen />);
 }
 
 // ─── テストスイート ──────────────────────────────────────────
@@ -130,7 +127,10 @@ describe('ResultScreen', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // 先に unmount して useEffect のクリーンアップ（cancelled = true）を実行する。
+    // これにより abort() 後の reject → catch でも setSubmitState は呼ばれない。
+    await cleanup();
     loadingAbortController?.abort();
     loadingAbortController = null;
   });
@@ -142,10 +142,6 @@ describe('ResultScreen', () => {
       await renderResultScreen();
 
       expect(screen.getByText('採点中...')).toBeTruthy();
-
-      await act(async () => {
-        loadingAbortController?.abort();
-      });
     });
 
     it('ローディング中はランキングテーブルが表示されない', async () => {
@@ -153,10 +149,6 @@ describe('ResultScreen', () => {
       await renderResultScreen();
 
       expect(screen.queryByText('ランキング')).toBeNull();
-
-      await act(async () => {
-        loadingAbortController?.abort();
-      });
     });
   });
 
@@ -296,20 +288,15 @@ describe('ResultScreen', () => {
       await waitFor(() => {
         expect(screen.getByLabelText('A')).toBeTruthy();
       });
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('A'));
-        fireEvent.press(screen.getByLabelText('B'));
-        fireEvent.press(screen.getByLabelText('C'));
-        fireEvent.press(screen.getByLabelText('D'));
-        fireEvent.press(screen.getByLabelText('E'));
-      });
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('入力完了'));
-      });
+      await fireEvent.press(screen.getByLabelText('A'));
+      await fireEvent.press(screen.getByLabelText('B'));
+      await fireEvent.press(screen.getByLabelText('C'));
+      await fireEvent.press(screen.getByLabelText('D'));
+      await fireEvent.press(screen.getByLabelText('E'));
 
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('トップに戻る'));
-      });
+      await fireEvent.press(screen.getByLabelText('入力完了'));
+
+      await fireEvent.press(screen.getByLabelText('トップに戻る'));
 
       expect(mockReplace).toHaveBeenCalledTimes(1);
       expect(mockReplace).toHaveBeenCalledWith('/');
@@ -392,16 +379,13 @@ describe('ResultScreen', () => {
       await waitFor(() => {
         expect(screen.getByLabelText('A')).toBeTruthy();
       });
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('A'));
-        fireEvent.press(screen.getByLabelText('B'));
-        fireEvent.press(screen.getByLabelText('C'));
-        fireEvent.press(screen.getByLabelText('D'));
-        fireEvent.press(screen.getByLabelText('E'));
-      });
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('入力完了'));
-      });
+      await fireEvent.press(screen.getByLabelText('A'));
+      await fireEvent.press(screen.getByLabelText('B'));
+      await fireEvent.press(screen.getByLabelText('C'));
+      await fireEvent.press(screen.getByLabelText('D'));
+      await fireEvent.press(screen.getByLabelText('E'));
+
+      await fireEvent.press(screen.getByLabelText('入力完了'));
 
       // END 後は ScoreSummary + RankingTable が表示される。
       // 自分の行のユーザー名は入力した 'ABCDE' になる。
@@ -451,16 +435,13 @@ describe('ResultScreen', () => {
       await waitFor(() => {
         expect(screen.getByLabelText('A')).toBeTruthy();
       });
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('A'));
-        fireEvent.press(screen.getByLabelText('B'));
-        fireEvent.press(screen.getByLabelText('C'));
-        fireEvent.press(screen.getByLabelText('D'));
-        fireEvent.press(screen.getByLabelText('E'));
-      });
-      await act(async () => {
-        fireEvent.press(screen.getByLabelText('入力完了'));
-      });
+      await fireEvent.press(screen.getByLabelText('A'));
+      await fireEvent.press(screen.getByLabelText('B'));
+      await fireEvent.press(screen.getByLabelText('C'));
+      await fireEvent.press(screen.getByLabelText('D'));
+      await fireEvent.press(screen.getByLabelText('E'));
+
+      await fireEvent.press(screen.getByLabelText('入力完了'));
 
       await waitFor(() => {
         // 先頭は自分の行なので入力値 'ABCDE'、2位以降のユーザーを確認

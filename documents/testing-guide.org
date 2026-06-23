@@ -1,0 +1,500 @@
+#+TITLE: テストコード実践ガイド
+#+AUTHOR: Watanabe Jun
+#+DATE: 2026-06-23
+#+OPTIONS: toc:2 num:t
+
+本ドキュメントは、本プロジェクトにおけるテスト戦略・記述規約・パターン・注意点をまとめたものである。
+
+* 1. テスト戦略
+
+** 1.1 テストピラミッド
+
+テスタビリティを最大化するため、以下の3層構造を採用する。
+
+#+BEGIN_SRC text
+        ▲ Integration Tests  （少数・画面をまたぐ操作フローを検証）
+       ▲▲▲ Component Tests   （中程度・ユーザー操作と振る舞いを検証）
+    ▲▲▲▲▲▲▲ Unit Tests       （多数・高速・純粋なドメインロジック）
+#+END_SRC
+
+| 層          | 対象                          | ツール                        |
+|-------------+-------------------------------+-------------------------------|
+| Unit        | types.ts / constants.ts など  | Jest（React 不要・超高速）    |
+| Component   | LevelStepper など             | @testing-library/react-native |
+| Integration | 画面遷移・router.push の検証   | @testing-library/react-native |
+
+** 1.2 テスタビリティ原則
+
+1. *実装詳細をテストしない* — アニメーションの内部状態（=translateX.value= など）は検証しない。「ユーザーが見て操作できること」を軸にする。
+2. *=getByRole= / =getByLabelText= ファースト* — アクセシビリティ属性で要素を特定し、DOM 構造変更に強いテストにする。=getByTestId= は最終手段。
+3. *アニメーションはモック* — Reanimated の =setUpTests()= でモック化し、アニメーション完了を待たずに振る舞いをテストする。
+4. *ロジックをアニメーションから分離* — 状態更新（=onIndexChange= 等）をアニメーションコールバックの外で先に呼ぶことで、テスト環境でも確実に動作させる。
+5. *CI に統合* — =just check= にテストを組み込み、リグレッションを自動検知する。
+
+* 2. テスト環境
+
+** 2.1 主要ライブラリとバージョン
+
+| ライブラリ                           | バージョン | 役割                         |
+|--------------------------------------+------------+------------------------------|
+| =jest=                               | ~29.7      | テストランナー               |
+| =jest-expo=                          | ~54.0      | Expo 向けプリセット          |
+| =@testing-library/react-native= (RTL) | ^14.0      | コンポーネント描画・クエリ   |
+| =react-test-renderer=               | 19.1       | RTL 内部のレンダラー         |
+
+** 2.2 RTL v14 の重要な変更点
+
+=@testing-library/react-native= v14 では =render()= および =fireEvent= の全メソッドが *async* に変更された。
+内部で =await act(...)= を呼ぶため、テストコードでは以下の規約を厳守すること。
+
+*** =render()= は必ず =await= する
+
+#+BEGIN_SRC typescript
+// ✅ 正しい
+await render(<MyComponent />);
+
+// ❌ 誤り — screen が初期化されず「render function has not been called」エラーになる
+render(<MyComponent />);
+#+END_SRC
+
+*** =render()= を =act()= でラップしない
+
+=render()= は内部で =act()= を呼ぶため、外側から =act()= でラップすると二重になり
+=overlapping act() calls= 警告が発生する。
+
+#+BEGIN_SRC typescript
+// ✅ 正しい
+await render(<MyComponent />);
+
+// ❌ 誤り — overlapping act() 警告が発生する
+await act(async () => {
+  render(<MyComponent />);
+});
+#+END_SRC
+
+*** =fireEvent= は必ず =await= する
+
+=fireEvent.press()=, =fireEvent.changeText()=, =fireEvent.scroll()= 等すべてが async である。
+=await= を忘れると =overlapping act() calls= 警告が発生する。
+
+#+BEGIN_SRC typescript
+// ✅ 正しい
+await fireEvent.press(screen.getByLabelText('回答する'));
+
+// ❌ 誤り — 前の act() と重複する
+fireEvent.press(screen.getByLabelText('回答する'));
+#+END_SRC
+
+複数の =fireEvent= を連続で呼ぶ場合は、それぞれを =await= する。
+
+#+BEGIN_SRC typescript
+// ✅ 正しい — 1つずつ await して直列実行
+await fireEvent.press(screen.getByLabelText('A'));
+await fireEvent.press(screen.getByLabelText('B'));
+await fireEvent.press(screen.getByLabelText('C'));
+
+// ❌ 誤り — 並列に act() が走り overlapping 警告
+fireEvent.press(screen.getByLabelText('A'));
+fireEvent.press(screen.getByLabelText('B'));
+fireEvent.press(screen.getByLabelText('C'));
+#+END_SRC
+
+*** =act()= を直接使うケース
+
+RTL v14 においても =act()= を明示的に使う正当なケースが残る。
+
+#+BEGIN_SRC typescript
+// タイマーの進行
+await act(async () => {
+  jest.advanceTimersByTime(1000);
+});
+#+END_SRC
+
+* 3. テストファイルの構成
+
+** 3.1 ファイルの配置
+
+テストファイルは対象モジュールに近い =__tests__/= ディレクトリに配置する。
+
+#+BEGIN_SRC text
+features/quiz/
+├── components/
+│   ├── NumericKeypad.tsx
+│   └── RankingTable.tsx
+├── api/
+│   └── submitScore.ts
+└── __tests__/
+    ├── NumericKeypad.test.tsx
+    ├── RankingTable.test.tsx
+    └── submitScore.test.ts
+#+END_SRC
+
+** 3.2 ファイルヘッダー
+
+各テストファイルの先頭にはテスト方針を記載した JSDoc コメントを置く。
+テストの意図と範囲を明示することで、レビュー時の理解を助ける。
+
+#+BEGIN_SRC typescript
+/**
+ * ResultScreen.test.tsx — Integration tests for app/result.tsx
+ *
+ * テスト方針:
+ *   - result.tsx が submitScoreFunction を正しく呼び出すことを検証する。
+ *   - loading / success / error の3状態それぞれの表示を確認する。
+ *   - ranked: true のとき正解数・経過時間＋ランキングテーブルが表示されることを確認する。
+ */
+#+END_SRC
+
+** 3.3 =describe= / =it= の構造
+
+- 最上位の =describe= はコンポーネント名または画面名とする。
+- 2 階層目の =describe= は機能的な関心事でグループ化する。
+- =it= の説明文は日本語で、検証内容を具体的に記述する。
+
+#+BEGIN_SRC typescript
+describe('ResultScreen', () => {
+  describe('ローディング状態', () => {
+    it('callable が pending のとき「採点中...」が表示される', async () => { ... });
+  });
+
+  describe('成功状態 — ranked: true', () => {
+    it('正解数が表示される', async () => { ... });
+    it('ランキングに含まれるユーザー名が表示される', async () => { ... });
+  });
+
+  describe('エラー状態', () => {
+    it('callable が Error を throw したとき「エラーが発生しました」が表示される', async () => { ... });
+  });
+});
+#+END_SRC
+
+* 4. モック（Mock）パターン
+
+** 4.1 グローバルモック（=jest.setup.ts=）
+
+プロジェクト全体で共通のネイティブ依存を =jest.setup.ts= でモック化している。
+各テストファイルで再定義する必要はない。
+
+| モック対象                        | 概要                                               |
+|-----------------------------------+----------------------------------------------------|
+| =react-native-reanimated=        | =setUpTests()= でアニメーションを同期化            |
+| =expo-router=                    | =router.push= / =useRouter= / =useLocalSearchParams= を spy 化 |
+| =expo-font=                      | =useFonts= が常に =[true, null]= を返す            |
+| =expo-splash-screen=             | ネイティブ API をスタブ化                          |
+| =react-native-safe-area-context= | =SafeAreaView= → =View= ラッパーに差し替え         |
+| =@react-native-firebase/*=       | =app= / =functions= / =app-check= をスタブ化       |
+| =@/lib/firebase=                 | =initializeAppCheck()= の副作用を排除              |
+
+** 4.2 Firebase callable モック（ファイル単位）
+
+Firebase Cloud Functions を呼び出すテストでは、以下のパターンで =callable= を取得し制御する。
+=jest.mock= はファイル最上部に記述し、hoisting により import より先に評価される。
+
+#+BEGIN_SRC typescript
+// ─── ファイル最上部 ───
+jest.mock('@/lib/firebase', () => {
+  const callable = jest.fn();
+  return {
+    functions: {
+      httpsCallable: jest.fn(() => callable),
+      useEmulator: jest.fn(),
+    },
+    firebase: {},
+    __callable: callable, // テストからアクセスするためのバックドア
+  };
+});
+
+/* eslint-disable import/first */
+import { render, screen, ... } from '@testing-library/react-native';
+import ResultScreen from '@/app/result';
+/* eslint-enable import/first */
+
+// ─── callable の取得 ───
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const firebaseMock = require('@/lib/firebase');
+const callable: jest.Mock = firebaseMock.__callable;
+
+// ─── 各テストでの使い方 ───
+beforeEach(() => {
+  callable.mockClear();
+  callable.mockResolvedValue({ data: MOCK_RESPONSE });
+});
+#+END_SRC
+
+** 4.3 =__mocks__= ディレクトリは使用しない
+
+すべてのモックは =jest.mock()= によるインラインモック、
+または =jest.setup.ts= のグローバルモックで完結させる。
+
+* 5. レンダリングヘルパー
+
+** 5.1 コンポーネントテスト用
+
+Props を引数として受け取り、=await render()= で描画する。
+
+#+BEGIN_SRC typescript
+async function renderKeypad(overrides: Partial<NumericKeypadProps> = {}) {
+  const defaultProps: NumericKeypadProps = {
+    value: '',
+    onChange: jest.fn(),
+    onSubmit: jest.fn(),
+    disabled: false,
+    ...overrides,
+  };
+  await render(<NumericKeypad {...defaultProps} />);
+  return defaultProps;
+}
+#+END_SRC
+
+** 5.2 統合テスト用（画面テスト）
+
+=useLocalSearchParams= のモック設定を含む。
+
+#+BEGIN_SRC typescript
+async function renderResultScreen(params = DEFAULT_PARAMS) {
+  (useLocalSearchParams as jest.Mock).mockReturnValue(params);
+  await render(<ResultScreen />);
+}
+#+END_SRC
+
+* 6. 非同期処理のテスト
+
+** 6.1 =waitFor= による状態遷移の待機
+
+コンポーネント内の =useEffect= で API 呼び出し → state 更新が行われる場合、
+=waitFor= で UI に結果が反映されるまで待つ。
+
+#+BEGIN_SRC typescript
+await renderResultScreen();
+
+// API 呼び出し完了後に正解数が表示されるのを待つ
+await waitFor(() => {
+  expect(screen.getByText('正解数')).toBeTruthy();
+});
+#+END_SRC
+
+** 6.2 ローディング状態のテスト（AbortController パターン）
+
+永遠に resolve しない Promise を設定し、ローディング中の UI を検証する。
+テスト終了時に =abort()= で Promise を reject し、リソースリークを防ぐ。
+
+#+BEGIN_SRC typescript
+let loadingAbortController: AbortController | null = null;
+
+function setupLoadingResponse() {
+  loadingAbortController = new AbortController();
+  const { signal } = loadingAbortController;
+  callable.mockReturnValue(
+    new Promise<never>((_, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('aborted')));
+    })
+  );
+}
+
+afterEach(async () => {
+  // cleanup() で先に unmount → useEffect のクリーンアップ（cancelled = true）を実行。
+  // これにより abort() 後の reject → catch でも setSubmitState は呼ばれない。
+  await cleanup();
+  loadingAbortController?.abort();
+  loadingAbortController = null;
+});
+#+END_SRC
+
+*** =cleanup()= と =abort()= の順序が重要
+
+=abort()= は Promise を reject し、catch ブロック内の =setState= が呼ばれる可能性がある。
+コンポーネントが unmount 済みであれば =useEffect= のクリーンアップで =cancelled = true= が設定されるため
+=setState= は実行されない。したがって *必ず =cleanup()= を先に呼ぶ* こと。
+
+#+BEGIN_SRC text
+正しい順序:  cleanup() → abort()   （unmount 後なので setState は呼ばれない）
+誤った順序:  abort() → cleanup()   （unmount 前なので setState が act() 外で実行され console.error）
+#+END_SRC
+
+** 6.3 Fake Timers（タイマー制御）
+
+=setTimeout= を使うフロー（正誤フィードバックの表示時間など）では
+=jest.useFakeTimers()= で時間を制御する。
+
+#+BEGIN_SRC typescript
+jest.useFakeTimers();
+
+// ... テスト操作 ...
+
+await act(async () => {
+  jest.advanceTimersByTime(1000); // 1秒後のフィードバック消去を発火
+});
+
+expect(screen.queryByText('⭕')).toBeNull();
+
+jest.useRealTimers();
+#+END_SRC
+
+* 7. 要素クエリの優先順位
+
+ユーザーの視点に近いクエリを優先する（§1.2 原則2 参照）。
+
+| 優先度 | クエリ            | 用途                               | 例                                           |
+|--------+-------------------+------------------------------------+----------------------------------------------|
+| 1      | =getByLabelText=  | ボタン・入力要素の特定             | =screen.getByLabelText('トップに戻る')=      |
+| 2      | =getByText=       | 表示テキストの確認                 | =screen.getByText('採点中...')=              |
+| 3      | =getByRole=       | ロール付き要素の一括取得           | =screen.getAllByRole('button')=              |
+| 4      | =getByTestId=     | 他のクエリでは特定不可能な場合のみ | =screen.getByTestId('numeric-keypad-display')= |
+
+不在の確認には =query= 系を使い =.toBeNull()= でアサートする。
+
+#+BEGIN_SRC typescript
+// 要素が存在しないことの確認
+expect(screen.queryByText('ランキング')).toBeNull();
+
+// 複数要素の不在確認
+expect(screen.queryAllByText('—')).toHaveLength(0);
+#+END_SRC
+
+* 8. アサーションパターン
+
+** 8.1 要素の存在確認
+
+#+BEGIN_SRC typescript
+expect(screen.getByText('正解数')).toBeTruthy();
+#+END_SRC
+
+** 8.2 コールバックの検証
+
+#+BEGIN_SRC typescript
+expect(mockReplace).toHaveBeenCalledTimes(1);
+expect(mockReplace).toHaveBeenCalledWith('/');
+
+// 構造化されたオブジェクト引数
+expect(mockPush).toHaveBeenCalledWith({
+  pathname: '/quiz',
+  params: { levelId: 'M' },
+});
+#+END_SRC
+
+** 8.3 スタイルの検証
+
+#+BEGIN_SRC typescript
+const el = screen.getByText('ABCDE');
+const flatStyle = StyleSheet.flatten(el.props.style);
+expect(flatStyle.color).toBe('#FFFFFF');
+#+END_SRC
+
+** 8.4 disabled 状態の検証
+
+#+BEGIN_SRC typescript
+const button = screen.getByLabelText('入力完了');
+expect(button.props.accessibilityState?.disabled).toBe(true);
+#+END_SRC
+
+* 9. =beforeEach= / =afterEach= の規約
+
+** 9.1 =beforeEach=
+
+- =callable.mockClear()= でモックの呼び出し履歴をリセットする。
+- =useRouter= のモック戻り値を設定する。
+- 各テストグループで共通のモックレスポンスを設定する。
+
+#+BEGIN_SRC typescript
+let mockReplace: jest.Mock;
+
+beforeEach(() => {
+  callable.mockClear();
+  mockReplace = jest.fn();
+  (useRouter as jest.Mock).mockReturnValue({
+    push: jest.fn(),
+    replace: mockReplace,
+    back: jest.fn(),
+  });
+});
+#+END_SRC
+
+** 9.2 =afterEach=
+
+- pending な Promise のクリーンアップを行う（=cleanup()= → =abort()=）。
+- Fake Timers を使用した場合は =jest.useRealTimers()= で復元する。
+
+* 10. テストデータの定義
+
+モックレスポンスはファイル上部に定数として定義する。
+命名規則は =MOCK_RESPONSE_= プレフィックス + 状態を表す名前。
+
+#+BEGIN_SRC typescript
+const MOCK_RESPONSE_RANKED = {
+  ranked: true,
+  rank: 3,
+  correct_count: 18,
+  elapsed_time: 95.0,
+  claimToken: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx',
+  rankings: [
+    { rank: 1, username: 'Alice', correct_count: 20, elapsed_time: 60.0 },
+    { rank: 2, username: 'Bob', correct_count: 19, elapsed_time: 80.0 },
+    { rank: 3, username: '-----', correct_count: 18, elapsed_time: 95.0 },
+  ],
+};
+
+const MOCK_RESPONSE_NOT_RANKED = {
+  ranked: false,
+  rank: null,
+  correct_count: 10,
+  elapsed_time: 120.5,
+  claimToken: null,
+  rankings: [],
+};
+#+END_SRC
+
+* 11. よくある落とし穴と対策
+
+** 11.1 =overlapping act() calls=
+
+| 原因                                                   | 対策                                          |
+|--------------------------------------------------------+-----------------------------------------------|
+| =render()= を =act()= でラップしている                 | =await render()= のみにする                   |
+| =fireEvent.press()= を =await= していない              | =await fireEvent.press(...)= にする           |
+| 複数の =fireEvent= を同期的に連続呼び出ししている       | 各呼び出しを =await= で直列化する             |
+
+** 11.2 =not wrapped in act(...)=
+
+| 原因                                                         | 対策                                                     |
+|--------------------------------------------------------------+----------------------------------------------------------|
+| =afterEach= で unmount 前に =abort()= → state 更新が発生     | =cleanup()= を先に呼んでから =abort()= する              |
+| =jest.advanceTimersByTime()= を =act()= 外で呼んでいる       | =await act(async () => { jest.advanceTimersByTime(...) })= |
+
+** 11.3 =render function has not been called=
+
+| 原因                                          | 対策                            |
+|-----------------------------------------------+---------------------------------|
+| =render()= を =await= していない（RTL v14）    | =await render(...)= にする     |
+
+** 11.4 テストのタイムアウト・ハング
+
+| 原因                                                    | 対策                                                                       |
+|---------------------------------------------------------+----------------------------------------------------------------------------|
+| =afterEach= の =act()= 内で pending Promise を待ち続ける | =cleanup()= で先に unmount し、=act()= を使わずに =abort()= する           |
+| ローディングテスト後に Promise がリークしている           | =AbortController= パターンで明示的に reject する                           |
+
+* 12. テスト実行
+
+** 12.1 コマンド
+
+#+BEGIN_SRC shell
+# 全テスト実行
+npx jest
+
+# カバレッジ付き
+npx jest --coverage
+
+# 特定ファイルのみ
+npx jest features/quiz/__tests__/ResultScreen.test.tsx
+
+# 特定の describe/it のみ
+npx jest -t "ローディング状態"
+
+# CI チェック（TypeScript + ESLint + Prettier + gitleaks + テスト）
+just check
+#+END_SRC
+
+** 12.2 カバレッジ基準
+
+=package.json= で =lines: 80%= のグローバル閾値が設定されている。
+対象は =features/=, =app/=, =components/= 配下の =.ts= / =.tsx= ファイル。
