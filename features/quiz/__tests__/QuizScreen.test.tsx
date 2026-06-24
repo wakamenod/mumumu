@@ -45,6 +45,7 @@ jest.mock('expo-crypto', () => ({
 // import/first ルールの警告を抑制する。
 /* eslint-disable import/first */
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import * as ExpoCrypto from 'expo-crypto';
@@ -345,7 +346,11 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       // 'Z' は DIFFICULTY_LEVELS に存在しない ID
       (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'Z' });
       const mockSetOptions = jest.fn();
-      (useNavigation as jest.Mock).mockReturnValue({ setOptions: mockSetOptions });
+      (useNavigation as jest.Mock).mockReturnValue({
+        setOptions: mockSetOptions,
+        addListener: jest.fn(() => jest.fn()),
+        dispatch: jest.fn(),
+      });
 
       await act(async () => {
         render(<QuizScreen />);
@@ -730,6 +735,166 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       });
       expect(screen.getByLabelText('回答する')).toBeTruthy();
       expect(screen.getByText('問 1 / 3')).toBeTruthy();
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  describe('画面離脱の確認ダイアログ（beforeRemove）', () => {
+    /**
+     * テスト方針:
+     *   - quiz.tsx は クイズ進行中（データ取得成功 + カウントダウン完了後）に
+     *     navigation.addListener('beforeRemove', ...) を登録し、
+     *     戻るボタンやスワイプバックによる画面離脱時に Alert で確認する。
+     *   - addListener に渡されたコールバックを取り出し、
+     *     模擬イベントを渡して Alert.alert の呼び出しと
+     *     ボタン押下時の振る舞いを検証する。
+     */
+
+    let mockAddListener: jest.Mock;
+    let mockDispatch: jest.Mock;
+    let alertSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      mockAddListener = jest.fn(() => jest.fn());
+      mockDispatch = jest.fn();
+      (useNavigation as jest.Mock).mockReturnValue({
+        setOptions: jest.fn(),
+        addListener: mockAddListener,
+        dispatch: mockDispatch,
+      });
+      alertSpy = jest.spyOn(Alert, 'alert');
+    });
+
+    afterEach(() => {
+      alertSpy.mockRestore();
+    });
+
+    it('クイズ進行中に beforeRemove リスナーが登録される', async () => {
+      await renderQuizScreen();
+
+      expect(mockAddListener).toHaveBeenCalledWith('beforeRemove', expect.any(Function));
+    });
+
+    it('ローディング中は beforeRemove リスナーが登録されない', async () => {
+      setupLoadingResponse();
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      expect(mockAddListener).not.toHaveBeenCalledWith('beforeRemove', expect.any(Function));
+
+      // テスト終了前に abort
+      await act(async () => {
+        loadingAbortController?.abort();
+      });
+    });
+
+    it('カウントダウン中は beforeRemove リスナーが登録されない', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      // カウントダウンが表示される（まだ完了していない）
+      await waitFor(() => {
+        expect(screen.getByText('3')).toBeTruthy();
+      });
+
+      expect(mockAddListener).not.toHaveBeenCalledWith('beforeRemove', expect.any(Function));
+    });
+
+    it('beforeRemove コールバックが e.preventDefault() を呼び Alert を表示する', async () => {
+      await renderQuizScreen();
+
+      // addListener に渡されたコールバックを取り出す
+      const beforeRemoveCall = mockAddListener.mock.calls.find(
+        (call) => call[0] === 'beforeRemove'
+      );
+      expect(beforeRemoveCall).toBeDefined();
+      const callback = beforeRemoveCall![1] as (e: unknown) => void;
+
+      // 模擬イベント
+      const mockPreventDefault = jest.fn();
+      const mockAction = { type: 'GO_BACK' };
+      const mockEvent = {
+        preventDefault: mockPreventDefault,
+        data: { action: mockAction },
+      };
+
+      callback(mockEvent);
+
+      expect(mockPreventDefault).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledWith(
+        'クイズを中断しますか？',
+        undefined,
+        expect.arrayContaining([
+          expect.objectContaining({ text: 'キャンセル', style: 'cancel' }),
+          expect.objectContaining({ text: '中断する', style: 'destructive' }),
+        ])
+      );
+    });
+
+    it('「中断する」を押すと navigation.dispatch が元のアクションで呼ばれる', async () => {
+      await renderQuizScreen();
+
+      const beforeRemoveCall = mockAddListener.mock.calls.find(
+        (call) => call[0] === 'beforeRemove'
+      );
+      const callback = beforeRemoveCall![1] as (e: unknown) => void;
+
+      const mockAction = { type: 'GO_BACK' };
+      const mockEvent = {
+        preventDefault: jest.fn(),
+        data: { action: mockAction },
+      };
+
+      callback(mockEvent);
+
+      // Alert.alert の第3引数（ボタン配列）から「中断する」の onPress を取り出す
+      const buttons = alertSpy.mock.calls[0][2] as {
+        text: string;
+        onPress?: () => void;
+      }[];
+      const destructiveButton = buttons.find((b) => b.text === '中断する');
+      expect(destructiveButton).toBeDefined();
+
+      destructiveButton!.onPress!();
+
+      expect(mockDispatch).toHaveBeenCalledTimes(1);
+      expect(mockDispatch).toHaveBeenCalledWith(mockAction);
+    });
+
+    it('「キャンセル」を押しても navigation.dispatch は呼ばれない', async () => {
+      await renderQuizScreen();
+
+      const beforeRemoveCall = mockAddListener.mock.calls.find(
+        (call) => call[0] === 'beforeRemove'
+      );
+      const callback = beforeRemoveCall![1] as (e: unknown) => void;
+
+      const mockEvent = {
+        preventDefault: jest.fn(),
+        data: { action: { type: 'GO_BACK' } },
+      };
+
+      callback(mockEvent);
+
+      // Alert.alert の第3引数（ボタン配列）から「キャンセル」を取り出す
+      const buttons = alertSpy.mock.calls[0][2] as {
+        text: string;
+        onPress?: () => void;
+      }[];
+      const cancelButton = buttons.find((b) => b.text === 'キャンセル');
+      expect(cancelButton).toBeDefined();
+
+      // キャンセルボタンには onPress がないか、あっても dispatch を呼ばない
+      cancelButton?.onPress?.();
+
+      expect(mockDispatch).not.toHaveBeenCalled();
     });
   });
 });

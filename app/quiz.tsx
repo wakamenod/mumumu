@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
@@ -92,6 +92,26 @@ export default function QuizScreen() {
       cancelled = true;
     };
   }, [levelId]);
+
+  // クイズ進行中の画面離脱を確認ダイアログでブロック
+  const isQuizInProgress = fetchState.status === 'success' && !showCountdown;
+  useEffect(() => {
+    if (!isQuizInProgress) return;
+
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      e.preventDefault();
+      Alert.alert('クイズを中断しますか？', undefined, [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '中断する',
+          style: 'destructive',
+          onPress: () => navigation.dispatch(e.data.action),
+        },
+      ]);
+    });
+
+    return unsubscribe;
+  }, [navigation, isQuizInProgress]);
 
   // 成功時のみ使う派生値
   const questions = fetchState.status === 'success' ? fetchState.data.questions : [];
