@@ -57,7 +57,9 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │   └── quiz/               # クイズ機能ドメイン
 │       ├── __tests__/      # クイズ機能のテスト群
 │       │   ├── constants.test.ts
+│       │   ├── CountdownOverlay.test.tsx     # カウントダウンオーバーレイのテスト
 │       │   ├── DifficultySelectScreen.test.tsx
+│       │   ├── ElapsedTimer.test.tsx         # 経過時間タイマーのテスト（rAF・AppState・リセット）
 │       │   ├── getRanking.test.ts        # getRankingFunction のユニットテスト
 │       │   ├── InitialsEntryForm.test.tsx # InitialsEntryForm コンポーネントのテスト
 │       │   ├── LevelStepper.test.tsx
@@ -75,6 +77,8 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │       │   ├── registerUsername.ts  # registerUsernameFunction 呼び出し
 │       │   └── submitScore.ts      # submitScoreFunction 呼び出し・RankingEntry 型定義
 │       ├── components/     # クイズ機能固有のUIコンポーネント
+│       │   ├── CountdownOverlay.tsx  # カウントダウンオーバーレイ（3-2-1 アニメーション）
+│       │   ├── ElapsedTimer.tsx      # 経過時間タイマー（rAF 駆動・AppState 対応・自己完結型）
 │       │   ├── InitialsEntryForm.tsx # イニシャル入力フォーム（3行10列ボタングリッド）
 │       │   ├── LevelStepper.tsx
 │       │   ├── MathDisplay.tsx       # LaTeX 数式レンダリング
@@ -108,14 +112,50 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 | LaTeX レンダリング   | react-native-mathjax-html-to-svg + react-native-svg     |
 | テスト               | Jest + @testing-library/react-native v14                 |
 | ボタン連打防止       | AppButton コンポーネント（Pressable ラッパー・スロットル内蔵） |
+| デジタルフォント     | DSEG7Classic (SIL Open Font License 1.1) — 7セグメント風タイマー表示 |
 
 * 7. テスト戦略
 
 テスト戦略・記述規約・実践パターンの詳細は [[file:testing-guide.org][testing-guide.org]] を参照のこと。
 
-* 8. LaTeX レンダリング
+* 8. 経過時間タイマー (ElapsedTimer)
 
-** 8.1 採用ライブラリと選定理由
+** 8.1 設計方針
+クイズ画面にて、カウントダウン完了後から経過時間をリアルタイムに表示する。
+パフォーマンスと正確性を両立するため、以下の設計を採用した。
+
+** 8.2 自己完結型コンポーネント
+=ElapsedTimer= はタイマーロジックをコンポーネント内部に閉じ込めた自己完結型である。
+親コンポーネント（=quiz.tsx=）は =startedAt= (Unix timestamp ms) を props で渡すのみで、
+再レンダリングの波及が =<Text>= ノード 1 つに限定される。
+
+当初は =useElapsedTimer= フックとして =quiz.tsx= に配置していたが、
+=setInterval(10ms)= による =useState= 更新が =QuizScreen= 全体（=MathDisplay=, =NumericKeypad= 等）の
+秒間 100 回再レンダリングを引き起こすパフォーマンス問題が発生したため、リファクタリングした。
+
+** 8.3 requestAnimationFrame 駆動
+=setInterval= ではなく =requestAnimationFrame= を使用する。
+- ディスプレイのリフレッシュレート（≈60fps / 16ms）に自然に同期する。
+- 0.01 秒（百分の一秒）精度の表示に十分な更新頻度を確保する。
+- バックグラウンド時に自動的に停止し、不要な CPU 消費を避ける。
+
+** 8.4 AppState 監視によるバックグラウンド復帰対応
+=requestAnimationFrame= はバックグラウンドで停止するため、フォアグラウンド復帰時に
+即座に正確な経過時間を再表示する必要がある。
+=AppState.addEventListener('change', ...)= を監視し、状態が =active= に戻った時点で
+=Date.now() - startedAt= を再計算する。
+絶対時刻ベースの計算のため、バックグラウンド中の経過時間も自然に反映される。
+
+** 8.5 DSEG7 フォント
+経過時間の表示には 7 セグメントディスプレイ風フリーフォント「DSEG7Classic-Bold」を使用する。
+- ライセンス: SIL Open Font License 1.1（商用利用可、再配布可）
+- フォントファイル: =assets/fonts/DSEG7Classic-Bold.ttf=
+- =app/_layout.tsx= の =useFonts= でアプリ起動時に読み込む。
+- 表示形式: =mm:ss.dd=（例: =00:12.34=）
+
+* 9. LaTeX レンダリング
+
+** 9.1 採用ライブラリと選定理由
 クイズの問題文はサーバー（Firebase Storage）から LaTeX 形式の文字列として配信される。
 これをアプリ側でレンダリングするために、以下のライブラリを採用する。
 
@@ -130,7 +170,7 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 - *MathJax 内蔵*: ライブラリ内に MathJax をバンドル済みのため、別途 MathJax のセットアップが不要。
 - *大学レベルまでの数式を網羅*: MathJax ベースのため複雑な LaTeX（積分・行列・複素数など）に対応。
 
-** 8.2 コンポーネント API
+** 9.2 コンポーネント API
 
 =features/quiz/components/MathDisplay.tsx= がドメイン内の LaTeX 描画コンポーネントである。
 
@@ -150,7 +190,7 @@ import { MathDisplay } from '@/features/quiz';
 
 内部では =$$...$$= で囲んでディスプレイ数式（ブロック表示）としてレンダリングする。
 
-** 8.3 不採用とした代替案
+** 9.3 不採用とした代替案
 
 | 候補ライブラリ      | 不採用理由                                                                          |
 |---------------------+-------------------------------------------------------------------------------------|
@@ -168,7 +208,7 @@ import { MathDisplay } from '@/features/quiz';
 3. *=AllPackages= による事前登録も無効*: =AllPackages.js= の静的 import で回避を試みたが、
    Configuration 初期化時に動的ローダーが呼ばれるため解決に至らなかった。
 
-** 8.4 iOS ビルド上の注意（Podfile パッチ）
+** 9.4 iOS ビルド上の注意（Podfile パッチ）
 =react-native-svg= の追加に伴い、iOS ネイティブビルドで以下の問題が発生するため対処が必要である。
 
 *問題*: React Native が依存する C++ ライブラリ =fmt= が、Apple Clang 16+（Xcode 16 以降）で

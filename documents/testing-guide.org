@@ -191,7 +191,7 @@ describe('ResultScreen', () => {
 | モック対象                        | 概要                                               |
 |-----------------------------------+----------------------------------------------------|
 | =react-native-reanimated=        | =setUpTests()= でアニメーションを同期化            |
-| =expo-router=                    | =router.push= / =useRouter= / =useLocalSearchParams= を spy 化 |
+| =expo-router=                    | =router.push= / =useRouter= / =useLocalSearchParams= / =useNavigation= を spy 化 |
 | =expo-font=                      | =useFonts= が常に =[true, null]= を返す            |
 | =expo-splash-screen=             | ネイティブ API をスタブ化                          |
 | =react-native-safe-area-context= | =SafeAreaView= → =View= ラッパーに差し替え         |
@@ -371,7 +371,79 @@ expect(screen.queryByText('⭕')).toBeNull();
 jest.useRealTimers();
 #+END_SRC
 
-* 7. 要素クエリの優先順位
+* 7. requestAnimationFrame を使うコンポーネントのテスト
+
+=ElapsedTimer= のように =requestAnimationFrame= (rAF) を使用するコンポーネントは、
+=setInterval= / =setTimeout= とは異なるテストパターンが必要になる。
+
+** 7.1 Fake Timers と rAF
+
+Jest 29 の =jest.useFakeTimers()= (modern mode) は =requestAnimationFrame= もフェイク化する。
+=jest.advanceTimersByTime(16)= で rAF コールバックを1フレーム分発火できる。
+
+** 7.2 =Date.now()= の制御
+
+rAF コールバック内で =Date.now()= を使う場合、=jest.setSystemTime()= で制御する。
+ただし =jest.advanceTimersByTime(16)= が =Date.now()= を +16ms 進めるため、
+rAF 発火時点の =Date.now()= に 16ms のオフセットが生じる。
+
+以下の =advanceTimeTo= ヘルパーはこのオフセットを吸収する。
+
+#+BEGIN_SRC typescript
+async function advanceTimeTo(isoOrMs: string | number) {
+  const targetMs = typeof isoOrMs === 'string' ? new Date(isoOrMs).getTime() : isoOrMs;
+  // rAF 発火時に Date.now() が targetMs を返すよう、16ms 手前にセット
+  jest.setSystemTime(new Date(targetMs - 16));
+  await act(async () => {
+    jest.advanceTimersByTime(16);
+  });
+}
+#+END_SRC
+
+** 7.3 AppState のモック
+
+=AppState.addEventListener= をスパイし、リスナーを取得して手動発火する。
+
+#+BEGIN_SRC typescript
+let appStateListener: ((state: string) => void) | null = null;
+const removeMock = jest.fn();
+jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+  appStateListener = listener as (state: string) => void;
+  return { remove: removeMock } as ReturnType<typeof AppState.addEventListener>;
+});
+
+// フォアグラウンド復帰をシミュレート
+jest.setSystemTime(new Date('2024-01-01T00:01:00.000Z'));
+await act(async () => {
+  appStateListener!('active');
+});
+#+END_SRC
+
+** 7.4 unmount / rerender の注意点
+
+RTL v14 では =render()= が Promise を返すため、=await act()= 内で呼んでも
+分割代入（ =const { unmount } = render(...)= ）では値が取得できないことがある。
+=screen.unmount()= や =screen.rerender()= を使うと確実に動作する。
+
+#+BEGIN_SRC typescript
+// unmount
+await act(async () => {
+  render(<ElapsedTimer startedAt={startedAt} color="#000" />);
+});
+await act(async () => {
+  screen.unmount();
+});
+
+// rerender
+await act(async () => {
+  render(<ElapsedTimer startedAt={startedAt} color="#000" />);
+});
+await act(async () => {
+  screen.rerender(<ElapsedTimer startedAt={null} color="#000" />);
+});
+#+END_SRC
+
+* 8. 要素クエリの優先順位
 
 ユーザーの視点に近いクエリを優先する（§1.2 原則2 参照）。
 
@@ -392,15 +464,15 @@ expect(screen.queryByText('ランキング')).toBeNull();
 expect(screen.queryAllByText('—')).toHaveLength(0);
 #+END_SRC
 
-* 8. アサーションパターン
+* 9. アサーションパターン
 
-** 8.1 要素の存在確認
+** 9.1 要素の存在確認
 
 #+BEGIN_SRC typescript
 expect(screen.getByText('正解数')).toBeTruthy();
 #+END_SRC
 
-** 8.2 コールバックの検証
+** 9.2 コールバックの検証
 
 #+BEGIN_SRC typescript
 expect(mockReplace).toHaveBeenCalledTimes(1);
@@ -413,7 +485,7 @@ expect(mockPush).toHaveBeenCalledWith({
 });
 #+END_SRC
 
-** 8.3 スタイルの検証
+** 9.3 スタイルの検証
 
 #+BEGIN_SRC typescript
 const el = screen.getByText('ABCDE');
@@ -421,16 +493,16 @@ const flatStyle = StyleSheet.flatten(el.props.style);
 expect(flatStyle.color).toBe('#FFFFFF');
 #+END_SRC
 
-** 8.4 disabled 状態の検証
+** 9.4 disabled 状態の検証
 
 #+BEGIN_SRC typescript
 const button = screen.getByLabelText('入力完了');
 expect(button.props.accessibilityState?.disabled).toBe(true);
 #+END_SRC
 
-* 9. =beforeEach= / =afterEach= の規約
+* 10. =beforeEach= / =afterEach= の規約
 
-** 9.1 =beforeEach=
+** 10.1 =beforeEach=
 
 - =callable.mockClear()= でモックの呼び出し履歴をリセットする。
 - =useRouter= のモック戻り値を設定する。
@@ -450,12 +522,12 @@ beforeEach(() => {
 });
 #+END_SRC
 
-** 9.2 =afterEach=
+** 10.2 =afterEach=
 
 - pending な Promise のクリーンアップを行う（=cleanup()= → =abort()=）。
 - Fake Timers を使用した場合は =jest.useRealTimers()= で復元する。
 
-* 10. テストデータの定義
+* 11. テストデータの定義
 
 モックレスポンスはファイル上部に定数として定義する。
 命名規則は =MOCK_RESPONSE_= プレフィックス + 状態を表す名前。
@@ -484,9 +556,9 @@ const MOCK_RESPONSE_NOT_RANKED = {
 };
 #+END_SRC
 
-* 11. よくある落とし穴と対策
+* 12. よくある落とし穴と対策
 
-** 11.1 =overlapping act() calls=
+** 12.1 =overlapping act() calls=
 
 | 原因                                                   | 対策                                          |
 |--------------------------------------------------------+-----------------------------------------------|
@@ -494,29 +566,29 @@ const MOCK_RESPONSE_NOT_RANKED = {
 | =fireEvent.press()= を =await= していない              | =await fireEvent.press(...)= にする           |
 | 複数の =fireEvent= を同期的に連続呼び出ししている       | 各呼び出しを =await= で直列化する             |
 
-** 11.2 =not wrapped in act(...)=
+** 12.2 =not wrapped in act(...)=
 
 | 原因                                                         | 対策                                                     |
 |--------------------------------------------------------------+----------------------------------------------------------|
 | =afterEach= で unmount 前に =abort()= → state 更新が発生     | =cleanup()= を先に呼んでから =abort()= する              |
 | =jest.advanceTimersByTime()= を =act()= 外で呼んでいる       | =await act(async () => { jest.advanceTimersByTime(...) })= |
 
-** 11.3 =render function has not been called=
+** 12.3 =render function has not been called=
 
 | 原因                                          | 対策                            |
 |-----------------------------------------------+---------------------------------|
 | =render()= を =await= していない（RTL v14）    | =await render(...)= にする     |
 
-** 11.4 テストのタイムアウト・ハング
+** 12.4 テストのタイムアウト・ハング
 
 | 原因                                                    | 対策                                                                       |
 |---------------------------------------------------------+----------------------------------------------------------------------------|
 | =afterEach= の =act()= 内で pending Promise を待ち続ける | =cleanup()= で先に unmount し、=act()= を使わずに =abort()= する           |
 | ローディングテスト後に Promise がリークしている           | =AbortController= パターンで明示的に reject する                           |
 
-* 12. テスト実行
+* 13. テスト実行
 
-** 12.1 コマンド
+** 13.1 コマンド
 
 #+BEGIN_SRC shell
 # 全テスト実行
@@ -535,7 +607,7 @@ npx jest -t "ローディング状態"
 just check
 #+END_SRC
 
-** 12.2 カバレッジ基準
+** 13.2 カバレッジ基準
 
 =package.json= で =lines: 80%= のグローバル閾値が設定されている。
 対象は =features/=, =app/=, =components/= 配下の =.ts= / =.tsx= ファイル。

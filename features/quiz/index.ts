@@ -8,3 +8,4 @@ export { CountdownOverlay } from './components/CountdownOverlay';
 export { MathDisplay } from './components/MathDisplay';
 export { NumericKeypad } from './components/NumericKeypad';
 export { RankingTable } from './components/RankingTable';
+export { ElapsedTimer } from './components/ElapsedTimer';

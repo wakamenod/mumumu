@@ -26,6 +26,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    DSEG7Classic: require('../assets/fonts/DSEG7Classic-Bold.ttf'),
     ...FontAwesome.font,
   });
 

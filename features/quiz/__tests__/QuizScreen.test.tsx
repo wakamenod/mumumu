@@ -46,7 +46,7 @@ jest.mock('expo-crypto', () => ({
 /* eslint-disable import/first */
 import React from 'react';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import * as ExpoCrypto from 'expo-crypto';
 
 import QuizScreen from '@/app/quiz';
@@ -341,18 +341,18 @@ describe('QuizScreen — NumericKeypad との統合', () => {
 
   // ────────────────────────────────────────────────────────────
   describe('未知の levelId のフォールバック表示', () => {
-    it('DIFFICULTY_LEVELS に存在しない levelId のとき、ヘッダーに levelId がそのまま表示される', async () => {
+    it('DIFFICULTY_LEVELS に存在しない levelId のとき、ナビゲーションヘッダーに "クイズ" がフォールバック表示される', async () => {
       // 'Z' は DIFFICULTY_LEVELS に存在しない ID
       (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'Z' });
+      const mockSetOptions = jest.fn();
+      (useNavigation as jest.Mock).mockReturnValue({ setOptions: mockSetOptions });
 
       await act(async () => {
         render(<QuizScreen />);
       });
 
-      // level が見つからない場合は levelId 文字列をそのまま badge に表示する
-      await waitFor(() => {
-        expect(screen.getByText('Z')).toBeTruthy();
-      });
+      // level が見つからない場合は navigation.setOptions で 'クイズ' をフォールバック表示する
+      expect(mockSetOptions).toHaveBeenCalledWith({ title: 'クイズ' });
     });
   });
 

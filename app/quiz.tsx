@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
@@ -8,6 +8,7 @@ import Colors from '@/constants/Colors';
 import {
   CountdownOverlay,
   DIFFICULTY_LEVELS,
+  ElapsedTimer,
   MathDisplay,
   NumericKeypad,
   getQuiz,
@@ -32,6 +33,14 @@ export default function QuizScreen() {
   const level = DIFFICULTY_LEVELS.find((l) => l.id === levelId);
 
   const router = useRouter();
+  const navigation = useNavigation();
+
+  // ヘッダータイトルをレベル名に設定
+  useEffect(() => {
+    navigation.setOptions({
+      title: level?.label ?? 'クイズ',
+    });
+  }, [navigation, level]);
 
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'loading' });
   const [showCountdown, setShowCountdown] = useState(true);
@@ -43,6 +52,7 @@ export default function QuizScreen() {
   const [answers, setAnswers] = useState<AnswerEntry[]>([]);
   // クイズ開始時刻（ms Unix timestamp）
   const startedAtRef = useRef<number | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   // 結果画面へのナビゲーション済みフラグ（スワイプバック後の二重送信を防止）
   const hasNavigatedToResultRef = useRef(false);
   // 回答処理中フラグ（非同期処理 + 900ms 待機中の二重送信を防止）
@@ -92,7 +102,9 @@ export default function QuizScreen() {
   // カウントダウン完了時のハンドラ
   const handleCountdownComplete = useCallback(() => {
     setShowCountdown(false);
-    startedAtRef.current = Date.now();
+    const now = Date.now();
+    startedAtRef.current = now;
+    setStartedAt(now);
   }, []);
 
   const handleSubmit = useCallback(async () => {
@@ -141,14 +153,13 @@ export default function QuizScreen() {
     <View style={[styles.container, { backgroundColor: colors.screenBackground }]}>
       {/* ─ ヘッダー ─ */}
       <View style={styles.header}>
-        <Text style={[styles.badge, { color: level?.color ?? colors.accent }]}>
-          {level?.label ?? levelId ?? '不明'}
-        </Text>
-
         {fetchState.status === 'success' && !showCountdown && (
-          <Text style={[styles.progress, { color: colors.levelDescription }]}>
-            問 {currentIndex + 1} / {totalCount}
-          </Text>
+          <>
+            <ElapsedTimer startedAt={startedAt} color={colors.levelDescription} />
+            <Text style={[styles.progress, { color: colors.levelDescription }]}>
+              問 {currentIndex + 1} / {totalCount}
+            </Text>
+          </>
         )}
       </View>
 
@@ -235,11 +246,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     gap: 6,
-  },
-  badge: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
   progress: {
     fontSize: 14,
