@@ -44,13 +44,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5A623',
     paddingBottom: 6,
     alignItems: 'center',
-    // iOS の影
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    // Android の影
-    elevation: 8,
+    // 注意: shadow / elevation はネイティブスタックヘッダー（UINavigationBar 等）の
+    // タッチ領域を遮断するため意図的に付与しない。
+    // pointerEvents="none" は RN View 層のタッチを透過するが、
+    // elevation が付くと Android ネイティブ層でヒットテストに干渉する。
   },
   text: {
     fontSize: 11,
