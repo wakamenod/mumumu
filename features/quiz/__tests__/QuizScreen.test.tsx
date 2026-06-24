@@ -109,11 +109,15 @@ function setupEmptyResponse() {
 }
 
 /**
- * QuizScreen を render して、クイズデータ取得完了まで待機する。
+ * QuizScreen を render して、クイズデータ取得完了 + カウントダウン完了まで待機する。
  *
  * 注意: MathDisplay は SVG で数式を描画するため、問題文テキスト（"1 + 1" など）は
  * DOM に存在しない。代わりに NumericKeypad の表示エリア（testID）が出現することで
  * 「success 状態に遷移した」ことを確認する。
+ *
+ * カウントダウン（3秒）を fake timers でスキップするため、
+ * この関数を呼ぶ前に jest.useFakeTimers() が有効であることが前提。
+ * 呼び出し側で jest.useRealTimers() を忘れずに行うこと。
  */
 async function renderQuizScreen() {
   (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
@@ -122,7 +126,17 @@ async function renderQuizScreen() {
     render(<QuizScreen />);
   });
 
-  // NumericKeypad が表示されるまで待つ（= success 状態への遷移完了）
+  // getQuiz の Promise 解決を待つ（カウントダウンが表示される）
+  await waitFor(() => {
+    expect(screen.getByText('3')).toBeTruthy();
+  });
+
+  // カウントダウン 3秒をスキップする
+  await act(async () => {
+    jest.advanceTimersByTime(3000);
+  });
+
+  // NumericKeypad が表示されるまで待つ（= カウントダウン完了 → 問題表示）
   await waitFor(() => {
     expect(screen.getByTestId('numeric-keypad-display')).toBeTruthy();
   });
@@ -132,11 +146,13 @@ async function renderQuizScreen() {
 
 describe('QuizScreen — NumericKeypad との統合', () => {
   beforeEach(() => {
+    jest.useFakeTimers();
     callable.mockClear();
     setupSuccessResponse();
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     // setupLoadingResponse が生成した pending Promise をキャンセルして
     // ワーカーが終了できない状態（open handle）を防ぐ
     loadingAbortController?.abort();
@@ -160,7 +176,6 @@ describe('QuizScreen — NumericKeypad との統合', () => {
   // ────────────────────────────────────────────────────────────
   describe('問題切り替え時の入力リセット', () => {
     it('数字を入力後に "回答" を押すと次問に進み入力が "?" にリセットされる', async () => {
-      jest.useFakeTimers();
       await renderQuizScreen();
 
       // 数字を入力する
@@ -184,8 +199,6 @@ describe('QuizScreen — NumericKeypad との統合', () => {
         expect(screen.getByText('問 2 / 3')).toBeTruthy();
         expect(screen.getByTestId('numeric-keypad-display').props.children).toBe('?');
       });
-
-      jest.useRealTimers();
     });
   });
 
@@ -240,7 +253,6 @@ describe('QuizScreen — NumericKeypad との統合', () => {
     });
 
     it('最後の問題では「回答して結果を見る」ラベルになる', async () => {
-      jest.useFakeTimers();
       await renderQuizScreen();
 
       // 最後の問題（index 2）まで回答で進む
@@ -258,8 +270,6 @@ describe('QuizScreen — NumericKeypad との統合', () => {
 
       // 最後の問題ではラベルが変わる
       expect(screen.getByLabelText('回答して結果を見る')).toBeTruthy();
-
-      jest.useRealTimers();
     });
   });
 
@@ -379,7 +389,6 @@ describe('QuizScreen — NumericKeypad との統合', () => {
     let mockPush: jest.Mock;
 
     beforeEach(() => {
-      jest.useFakeTimers();
       mockPush = jest.fn();
       // useRouter が返す push を per-test の spy に差し替える
       (useRouter as jest.Mock).mockReturnValue({
@@ -387,10 +396,6 @@ describe('QuizScreen — NumericKeypad との統合', () => {
         replace: jest.fn(),
         back: jest.fn(),
       });
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
     });
 
     it('全問回答後に router.push が pathname: "/result" で呼ばれる', async () => {
@@ -535,17 +540,12 @@ describe('QuizScreen — NumericKeypad との統合', () => {
     let mockPush: jest.Mock;
 
     beforeEach(() => {
-      jest.useFakeTimers();
       mockPush = jest.fn();
       (useRouter as jest.Mock).mockReturnValue({
         push: mockPush,
         replace: jest.fn(),
         back: jest.fn(),
       });
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
     });
 
     it('最終問題を2回回答しても router.push は1回しか呼ばれない', async () => {
@@ -603,7 +603,6 @@ describe('QuizScreen — NumericKeypad との統合', () => {
     });
 
     it('回答後（タイマー進行前）に × が表示される（不正解の場合）', async () => {
-      jest.useFakeTimers();
       await renderQuizScreen();
 
       // 回答ボタンを押す（digestStringAsync はデフォルトで不一致を返す → 不正解）
@@ -619,14 +618,12 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       await act(async () => {
         jest.advanceTimersByTime(1000);
       });
-      jest.useRealTimers();
     });
 
     it('回答後（タイマー進行前）に ○ が表示される（正解の場合）', async () => {
       // 1問目の answer_hash と同じ値をモックが返す → 正解
       mockDigestStringAsync.mockResolvedValue(MOCK_QUESTIONS[0].answer_hash);
 
-      jest.useFakeTimers();
       await renderQuizScreen();
 
       await act(async () => {
@@ -640,11 +637,9 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       await act(async () => {
         jest.advanceTimersByTime(1000);
       });
-      jest.useRealTimers();
     });
 
     it('次の問題に進むと ○/× が消えて入力待ち状態に戻る', async () => {
-      jest.useFakeTimers();
       await renderQuizScreen();
 
       // 1問目に回答（不正解）
@@ -664,8 +659,77 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       });
       expect(screen.queryByText('×')).toBeNull();
       expect(screen.queryByText('○')).toBeNull();
+    });
+  });
 
-      jest.useRealTimers();
+  // ────────────────────────────────────────────────────────────
+  describe('カウントダウン表示', () => {
+    it('getQuiz 成功後にカウントダウン（数字「3」）が表示され、問題はまだ表示されない', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      // カウントダウンが表示される
+      await waitFor(() => {
+        expect(screen.getByText('3')).toBeTruthy();
+      });
+
+      // 問題エリア・キーパッドはまだ表示されない
+      expect(screen.queryByTestId('numeric-keypad-display')).toBeNull();
+    });
+
+    it('カウントダウン中は進捗表示（問 X / Y）が非表示である', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('3')).toBeTruthy();
+      });
+
+      expect(screen.queryByText(/問 \d+ \/ \d+/)).toBeNull();
+    });
+
+    it('カウントダウン中は回答ボタンが非表示である', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('3')).toBeTruthy();
+      });
+
+      expect(screen.queryByLabelText('回答する')).toBeNull();
+    });
+
+    it('カウントダウン完了後に問題と回答ボタンが表示される', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('3')).toBeTruthy();
+      });
+
+      // カウントダウン 3秒をスキップ
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+      });
+
+      // 問題表示・キーパッド・回答ボタン・進捗がすべて表示される
+      await waitFor(() => {
+        expect(screen.getByTestId('numeric-keypad-display')).toBeTruthy();
+      });
+      expect(screen.getByLabelText('回答する')).toBeTruthy();
+      expect(screen.getByText('問 1 / 3')).toBeTruthy();
     });
   });
 });

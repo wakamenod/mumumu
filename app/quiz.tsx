@@ -5,7 +5,13 @@ import { ActivityIndicator, StyleSheet, Text, View, useColorScheme } from 'react
 
 import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
-import { DIFFICULTY_LEVELS, MathDisplay, NumericKeypad, getQuiz } from '@/features/quiz';
+import {
+  CountdownOverlay,
+  DIFFICULTY_LEVELS,
+  MathDisplay,
+  NumericKeypad,
+  getQuiz,
+} from '@/features/quiz';
 import type { GetQuizResponse } from '@/features/quiz';
 import type { AnswerEntry } from '@/features/quiz/api/submitScore';
 
@@ -28,6 +34,7 @@ export default function QuizScreen() {
   const router = useRouter();
 
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'loading' });
+  const [showCountdown, setShowCountdown] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [inputRaw, setInputRaw] = useState('');
   // 各問の正誤 (true=正解, false=不正解, null=未回答)
@@ -59,8 +66,7 @@ export default function QuizScreen() {
         if (!cancelled) {
           setFetchState({ status: 'success', data });
           setCurrentIndex(0);
-          // 最初の問題が表示される時刻を開始時刻として記録
-          startedAtRef.current = Date.now();
+          // 開始時刻はカウントダウン完了後に記録する
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -82,6 +88,12 @@ export default function QuizScreen() {
   const totalCount = questions.length;
   const currentQuestion = questions[currentIndex];
   const isLastQuestion = currentIndex === totalCount - 1;
+
+  // カウントダウン完了時のハンドラ
+  const handleCountdownComplete = useCallback(() => {
+    setShowCountdown(false);
+    startedAtRef.current = Date.now();
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!currentQuestion) return;
@@ -133,7 +145,7 @@ export default function QuizScreen() {
           {level?.label ?? levelId ?? '不明'}
         </Text>
 
-        {fetchState.status === 'success' && (
+        {fetchState.status === 'success' && !showCountdown && (
           <Text style={[styles.progress, { color: colors.levelDescription }]}>
             問 {currentIndex + 1} / {totalCount}
           </Text>
@@ -170,8 +182,13 @@ export default function QuizScreen() {
           </View>
         )}
 
+        {/* カウントダウン */}
+        {fetchState.status === 'success' && showCountdown && (
+          <CountdownOverlay onComplete={handleCountdownComplete} />
+        )}
+
         {/* 問題表示 + 入力エリア */}
-        {fetchState.status === 'success' && currentQuestion && (
+        {fetchState.status === 'success' && !showCountdown && currentQuestion && (
           <View style={styles.questionArea}>
             <View style={styles.mathWrapper}>
               <MathDisplay latex={currentQuestion.question} />
@@ -187,7 +204,7 @@ export default function QuizScreen() {
       </View>
 
       {/* ─ 回答ボタン ─ */}
-      {fetchState.status === 'success' && totalCount > 0 && (
+      {fetchState.status === 'success' && !showCountdown && totalCount > 0 && (
         <View style={styles.navRow}>
           <AppButton
             style={[styles.submitButton, { backgroundColor: level?.color ?? colors.accent }]}

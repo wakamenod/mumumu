@@ -4,6 +4,7 @@ export { getQuiz } from './api/getQuiz';
 export type { GetQuizRequest, GetQuizResponse, QuizQuestion } from './api/getQuiz';
 export { getRanking } from './api/getRanking';
 export type { GetRankingRequest, GetRankingResponse } from './api/getRanking';
+export { CountdownOverlay } from './components/CountdownOverlay';
 export { MathDisplay } from './components/MathDisplay';
 export { NumericKeypad } from './components/NumericKeypad';
 export { RankingTable } from './components/RankingTable';
