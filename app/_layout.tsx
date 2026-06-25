@@ -60,7 +60,8 @@ function RootLayoutNav() {
             name="quiz"
             options={{
               title: 'クイズ',
-              headerBackTitle: '難易度選択',
+              headerBackVisible: false,
+              gestureEnabled: false,
             }}
           />
           <Stack.Screen

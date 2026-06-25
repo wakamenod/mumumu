@@ -1,4 +1,5 @@
 import * as Crypto from 'expo-crypto';
+import { HeaderBackButton } from '@react-navigation/elements';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View, useColorScheme } from 'react-native';
@@ -37,12 +38,34 @@ export default function QuizScreen() {
   const router = useRouter();
   const navigation = useNavigation();
 
-  // ヘッダータイトルをレベル名に設定
+  // クイズ進行中かどうか（headerLeft の挙動制御に使用）
+  const isQuizInProgressRef = useRef(false);
+
+  // ヘッダータイトル・カスタム戻るボタンを設定
   useEffect(() => {
     navigation.setOptions({
       title: level?.label ?? 'クイズ',
+      headerLeft: () => (
+        <HeaderBackButton
+          label="難易度選択"
+          onPress={() => {
+            if (isQuizInProgressRef.current) {
+              Alert.alert('クイズを中断しますか？', undefined, [
+                { text: 'キャンセル', style: 'cancel' },
+                {
+                  text: '中断する',
+                  style: 'destructive',
+                  onPress: () => router.back(),
+                },
+              ]);
+            } else {
+              router.back();
+            }
+          }}
+        />
+      ),
     });
-  }, [navigation, level]);
+  }, [navigation, level, router]);
 
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'loading' });
   const [showCountdown, setShowCountdown] = useState(true);
@@ -95,25 +118,11 @@ export default function QuizScreen() {
     };
   }, [levelId]);
 
-  // クイズ進行中の画面離脱を確認ダイアログでブロック
+  // クイズ進行中フラグを ref に同期（headerLeft のコールバックから参照）
   const isQuizInProgress = fetchState.status === 'success' && !showCountdown;
   useEffect(() => {
-    if (!isQuizInProgress) return;
-
-    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      e.preventDefault();
-      Alert.alert('クイズを中断しますか？', undefined, [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '中断する',
-          style: 'destructive',
-          onPress: () => navigation.dispatch(e.data.action),
-        },
-      ]);
-    });
-
-    return unsubscribe;
-  }, [navigation, isQuizInProgress]);
+    isQuizInProgressRef.current = isQuizInProgress;
+  }, [isQuizInProgress]);
 
   // 成功時のみ使う派生値
   const questions = fetchState.status === 'success' ? fetchState.data.questions : [];

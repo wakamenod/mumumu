@@ -14,7 +14,32 @@ import { setUpTests } from 'react-native-reanimated';
 setUpTests();
 
 // ─────────────────────────────────────────────────────────────
-// 2. expo-router のモック
+// 2. @react-navigation/elements のモック
+//    - HeaderBackButton をテスト用 Pressable に差し替える
+//    - label / onPress props を保持し、testID で取得可能にする
+// ─────────────────────────────────────────────────────────────
+jest.mock('@react-navigation/elements', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Pressable, Text } = require('react-native');
+
+  function MockHeaderBackButton(props: { label?: string; onPress?: () => void }) {
+    return React.createElement(
+      Pressable,
+      { testID: 'header-back-button', onPress: props.onPress, accessibilityRole: 'button' },
+      React.createElement(Text, null, props.label ?? 'Back')
+    );
+  }
+  MockHeaderBackButton.displayName = 'HeaderBackButton';
+
+  return {
+    HeaderBackButton: MockHeaderBackButton,
+  };
+});
+
+// ─────────────────────────────────────────────────────────────
+// 3. expo-router のモック
 //    - router.push / router.back などの遷移関数を Jest の spy に差し替える
 //    - useLocalSearchParams はテストごとに上書き可能
 // ─────────────────────────────────────────────────────────────
@@ -43,7 +68,7 @@ jest.mock('expo-router', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 3. expo-font のモック（テスト環境ではフォント読み込みをスキップ）
+// 4. expo-font のモック（テスト環境ではフォント読み込みをスキップ）
 // ─────────────────────────────────────────────────────────────
 jest.mock('expo-font', () => ({
   ...jest.requireActual('expo-font'),
@@ -53,7 +78,7 @@ jest.mock('expo-font', () => ({
 }));
 
 // ─────────────────────────────────────────────────────────────
-// 4. expo-splash-screen のモック
+// 5. expo-splash-screen のモック
 // ─────────────────────────────────────────────────────────────
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn(),
@@ -61,7 +86,7 @@ jest.mock('expo-splash-screen', () => ({
 }));
 
 // ─────────────────────────────────────────────────────────────
-// 5. react-native-safe-area-context のモック
+// 6. react-native-safe-area-context のモック
 //    テスト環境ではネイティブの SafeAreaProvider が不要なため
 //    シンプルな View ラッパーに差し替える
 // ─────────────────────────────────────────────────────────────
@@ -77,7 +102,7 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 6. react-native-google-mobile-ads のモック
+// 7. react-native-google-mobile-ads のモック
 //    ネイティブモジュール（RNGoogleMobileAdsModule）は Jest (Node.js) 環境
 //    では存在しないため、BannerAd 等をダミーコンポーネントに差し替える。
 // ─────────────────────────────────────────────────────────────
@@ -115,7 +140,7 @@ jest.mock('react-native-google-mobile-ads', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 7. @react-native-firebase のモック
+// 8. @react-native-firebase のモック
 //    ネイティブモジュール（RNFBAppModule 等）は Jest (Node.js) 環境では
 //    存在しないため、必要な API をスタブに差し替える。
 // ─────────────────────────────────────────────────────────────
@@ -143,7 +168,7 @@ jest.mock('@react-native-firebase/app', () => ({
 }));
 
 // ─────────────────────────────────────────────────────────────
-// 8. lib/firebase のモック
+// 9. lib/firebase のモック
 //    lib/firebase.ts は import 時に initializeAppCheck() を実行し、
 //    その非同期処理が Jest ワーカーに残留して open handle 警告を引き起こす。
 //    グローバルモックとして差し替えることで非同期処理の残留を防ぐ。

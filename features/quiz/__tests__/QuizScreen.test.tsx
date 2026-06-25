@@ -357,7 +357,7 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       });
 
       // level が見つからない場合は navigation.setOptions で 'クイズ' をフォールバック表示する
-      expect(mockSetOptions).toHaveBeenCalledWith({ title: 'クイズ' });
+      expect(mockSetOptions).toHaveBeenCalledWith(expect.objectContaining({ title: 'クイズ' }));
     });
   });
 
@@ -739,28 +739,52 @@ describe('QuizScreen — NumericKeypad との統合', () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  describe('画面離脱の確認ダイアログ（beforeRemove）', () => {
+  describe('ヘッダー戻るボタンの確認ダイアログ（headerLeft）', () => {
     /**
      * テスト方針:
-     *   - quiz.tsx は クイズ進行中（データ取得成功 + カウントダウン完了後）に
-     *     navigation.addListener('beforeRemove', ...) を登録し、
-     *     戻るボタンやスワイプバックによる画面離脱時に Alert で確認する。
-     *   - addListener に渡されたコールバックを取り出し、
-     *     模擬イベントを渡して Alert.alert の呼び出しと
-     *     ボタン押下時の振る舞いを検証する。
+     *   - quiz.tsx は navigation.setOptions で headerLeft にカスタムボタンを設定する。
+     *   - setOptions に渡された headerLeft コンポーネントをキャプチャし、
+     *     render して onPress の振る舞いを検証する。
+     *   - クイズ進行中: ボタン押下で Alert.alert が表示され、
+     *     「中断する」で router.back()、「キャンセル」で何もしない。
+     *   - 非進行中（ローディング/カウントダウン）: ボタン押下で直接 router.back() が呼ばれる。
      */
 
-    let mockAddListener: jest.Mock;
-    let mockDispatch: jest.Mock;
+    let mockSetOptions: jest.Mock;
+    let mockBack: jest.Mock;
     let alertSpy: jest.SpyInstance;
 
+    /**
+     * setOptions に渡された headerLeft ファクトリを呼び出し、
+     * 返された React element の props.onPress を取り出すヘルパー。
+     *
+     * headerLeft は () => <HeaderBackButton label="..." onPress={...} /> の形式。
+     * 呼び出すと React element が返るので、props.onPress を直接テストできる。
+     */
+    function getHeaderLeftOnPress(): (() => void) | undefined {
+      const calls = mockSetOptions.mock.calls;
+      for (let i = calls.length - 1; i >= 0; i--) {
+        if (calls[i][0].headerLeft) {
+          const factory = calls[i][0].headerLeft as () => React.ReactElement;
+          const element = factory();
+          return (element.props as { onPress?: () => void }).onPress;
+        }
+      }
+      return undefined;
+    }
+
     beforeEach(() => {
-      mockAddListener = jest.fn(() => jest.fn());
-      mockDispatch = jest.fn();
+      mockSetOptions = jest.fn();
+      mockBack = jest.fn();
       (useNavigation as jest.Mock).mockReturnValue({
-        setOptions: jest.fn(),
-        addListener: mockAddListener,
-        dispatch: mockDispatch,
+        setOptions: mockSetOptions,
+        addListener: jest.fn(() => jest.fn()),
+        dispatch: jest.fn(),
+      });
+      (useRouter as jest.Mock).mockReturnValue({
+        push: jest.fn(),
+        replace: jest.fn(),
+        back: mockBack,
       });
       alertSpy = jest.spyOn(Alert, 'alert');
     });
@@ -769,64 +793,23 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       alertSpy.mockRestore();
     });
 
-    it('クイズ進行中に beforeRemove リスナーが登録される', async () => {
+    it('navigation.setOptions に headerLeft が渡される', async () => {
       await renderQuizScreen();
 
-      expect(mockAddListener).toHaveBeenCalledWith('beforeRemove', expect.any(Function));
-    });
-
-    it('ローディング中は beforeRemove リスナーが登録されない', async () => {
-      setupLoadingResponse();
-      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
-
-      await act(async () => {
-        render(<QuizScreen />);
-      });
-
-      expect(mockAddListener).not.toHaveBeenCalledWith('beforeRemove', expect.any(Function));
-
-      // テスト終了前に abort
-      await act(async () => {
-        loadingAbortController?.abort();
-      });
-    });
-
-    it('カウントダウン中は beforeRemove リスナーが登録されない', async () => {
-      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
-
-      await act(async () => {
-        render(<QuizScreen />);
-      });
-
-      // カウントダウンが表示される（まだ完了していない）
-      await waitFor(() => {
-        expect(screen.getByText('3')).toBeTruthy();
-      });
-
-      expect(mockAddListener).not.toHaveBeenCalledWith('beforeRemove', expect.any(Function));
-    });
-
-    it('beforeRemove コールバックが e.preventDefault() を呼び Alert を表示する', async () => {
-      await renderQuizScreen();
-
-      // addListener に渡されたコールバックを取り出す
-      const beforeRemoveCall = mockAddListener.mock.calls.find(
-        (call) => call[0] === 'beforeRemove'
+      expect(mockSetOptions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headerLeft: expect.any(Function),
+        })
       );
-      expect(beforeRemoveCall).toBeDefined();
-      const callback = beforeRemoveCall![1] as (e: unknown) => void;
+    });
 
-      // 模擬イベント
-      const mockPreventDefault = jest.fn();
-      const mockAction = { type: 'GO_BACK' };
-      const mockEvent = {
-        preventDefault: mockPreventDefault,
-        data: { action: mockAction },
-      };
+    it('クイズ進行中にヘッダー戻るボタンを押すと Alert が表示される', async () => {
+      await renderQuizScreen();
 
-      callback(mockEvent);
+      const onPress = getHeaderLeftOnPress();
+      expect(onPress).toBeDefined();
+      onPress!();
 
-      expect(mockPreventDefault).toHaveBeenCalledTimes(1);
       expect(alertSpy).toHaveBeenCalledTimes(1);
       expect(alertSpy).toHaveBeenCalledWith(
         'クイズを中断しますか？',
@@ -836,23 +819,16 @@ describe('QuizScreen — NumericKeypad との統合', () => {
           expect.objectContaining({ text: '中断する', style: 'destructive' }),
         ])
       );
+      // Alert 表示時点では router.back() は呼ばれていない
+      expect(mockBack).not.toHaveBeenCalled();
     });
 
-    it('「中断する」を押すと navigation.dispatch が元のアクションで呼ばれる', async () => {
+    it('クイズ進行中に「中断する」を押すと router.back() が呼ばれる', async () => {
       await renderQuizScreen();
 
-      const beforeRemoveCall = mockAddListener.mock.calls.find(
-        (call) => call[0] === 'beforeRemove'
-      );
-      const callback = beforeRemoveCall![1] as (e: unknown) => void;
-
-      const mockAction = { type: 'GO_BACK' };
-      const mockEvent = {
-        preventDefault: jest.fn(),
-        data: { action: mockAction },
-      };
-
-      callback(mockEvent);
+      const onPress = getHeaderLeftOnPress();
+      expect(onPress).toBeDefined();
+      onPress!();
 
       // Alert.alert の第3引数（ボタン配列）から「中断する」の onPress を取り出す
       const buttons = alertSpy.mock.calls[0][2] as {
@@ -864,24 +840,15 @@ describe('QuizScreen — NumericKeypad との統合', () => {
 
       destructiveButton!.onPress!();
 
-      expect(mockDispatch).toHaveBeenCalledTimes(1);
-      expect(mockDispatch).toHaveBeenCalledWith(mockAction);
+      expect(mockBack).toHaveBeenCalledTimes(1);
     });
 
-    it('「キャンセル」を押しても navigation.dispatch は呼ばれない', async () => {
+    it('クイズ進行中に「キャンセル」を押しても router.back() は呼ばれない', async () => {
       await renderQuizScreen();
 
-      const beforeRemoveCall = mockAddListener.mock.calls.find(
-        (call) => call[0] === 'beforeRemove'
-      );
-      const callback = beforeRemoveCall![1] as (e: unknown) => void;
-
-      const mockEvent = {
-        preventDefault: jest.fn(),
-        data: { action: { type: 'GO_BACK' } },
-      };
-
-      callback(mockEvent);
+      const onPress = getHeaderLeftOnPress();
+      expect(onPress).toBeDefined();
+      onPress!();
 
       // Alert.alert の第3引数（ボタン配列）から「キャンセル」を取り出す
       const buttons = alertSpy.mock.calls[0][2] as {
@@ -891,10 +858,51 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       const cancelButton = buttons.find((b) => b.text === 'キャンセル');
       expect(cancelButton).toBeDefined();
 
-      // キャンセルボタンには onPress がないか、あっても dispatch を呼ばない
+      // キャンセルボタンには onPress がないか、あっても back を呼ばない
       cancelButton?.onPress?.();
 
-      expect(mockDispatch).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+    });
+
+    it('ローディング中にヘッダー戻るボタンを押すと Alert なしで直接 router.back() が呼ばれる', async () => {
+      setupLoadingResponse();
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      const onPress = getHeaderLeftOnPress();
+      expect(onPress).toBeDefined();
+      onPress!();
+
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+
+      // テスト終了前に abort
+      await act(async () => {
+        loadingAbortController?.abort();
+      });
+    });
+
+    it('カウントダウン中にヘッダー戻るボタンを押すと Alert なしで直接 router.back() が呼ばれる', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
+
+      await act(async () => {
+        render(<QuizScreen />);
+      });
+
+      // カウントダウンが表示される（まだ完了していない）
+      await waitFor(() => {
+        expect(screen.getByText('3')).toBeTruthy();
+      });
+
+      const onPress = getHeaderLeftOnPress();
+      expect(onPress).toBeDefined();
+      onPress!();
+
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
     });
   });
 });
