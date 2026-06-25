@@ -10,6 +10,7 @@ import {
   useColorScheme,
 } from 'react-native';
 
+import { TOTAL_QUESTIONS } from '@/features/quiz';
 import { AdBanner } from '@/components/AdBanner';
 import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
@@ -285,7 +286,10 @@ function ScoreSummary({ correctCount, elapsedTime, colors }: ScoreSummaryProps) 
         <Text style={[styles.scoreLabel, { color: colors.levelDescription }]}>正解数</Text>
         <Text style={[styles.scoreValue, { color: colors.accent }]}>
           {correctCount}
-          <Text style={[styles.scoreUnit, { color: colors.levelDescription }]}> / 20</Text>
+          <Text style={[styles.scoreUnit, { color: colors.levelDescription }]}>
+            {' '}
+            / {TOTAL_QUESTIONS}
+          </Text>
         </Text>
       </View>
       <View style={[styles.scoreDivider, { backgroundColor: colors.levelDescription }]} />
