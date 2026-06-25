@@ -118,7 +118,7 @@ scan-staged:
 # ───────────────────────────────────────────
 
 # 型チェック + lint + フォーマット確認 + シークレットスキャン + テストを一括実行
-check: typecheck lint format-check scan test
+check: typecheck lint-fix format-check scan test
 
 # ───────────────────────────────────────────
 # テスト
