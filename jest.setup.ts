@@ -86,9 +86,54 @@ jest.mock('expo-splash-screen', () => ({
 }));
 
 // ─────────────────────────────────────────────────────────────
-// 6. react-native-safe-area-context のモック
+// 6. @react-native-async-storage/async-storage のモック
+//    ネイティブモジュールは Jest 環境では存在しないため、
+//    インメモリのストレージに差し替える。
+// ─────────────────────────────────────────────────────────────
+jest.mock('@react-native-async-storage/async-storage', () => {
+  let store: Record<string, string> = {};
+  return {
+    __esModule: true,
+    default: {
+      getItem: jest.fn((key: string) => Promise.resolve(store[key] ?? null)),
+      setItem: jest.fn((key: string, value: string) => {
+        store[key] = value;
+        return Promise.resolve();
+      }),
+      removeItem: jest.fn((key: string) => {
+        delete store[key];
+        return Promise.resolve();
+      }),
+      clear: jest.fn(() => {
+        store = {};
+        return Promise.resolve();
+      }),
+      getAllKeys: jest.fn(() => Promise.resolve(Object.keys(store))),
+      multiGet: jest.fn((keys: string[]) =>
+        Promise.resolve(keys.map((k) => [k, store[k] ?? null]))
+      ),
+      multiSet: jest.fn((pairs: [string, string][]) => {
+        pairs.forEach(([k, v]) => {
+          store[k] = v;
+        });
+        return Promise.resolve();
+      }),
+      multiRemove: jest.fn((keys: string[]) => {
+        keys.forEach((k) => delete store[k]);
+        return Promise.resolve();
+      }),
+      // テスト間でストアをリセットするためのヘルパー
+      __resetStore: () => {
+        store = {};
+      },
+    },
+  };
+});
+
+// ─────────────────────────────────────────────────────────────
+// 7. react-native-safe-area-context のモック
 //    テスト環境ではネイティブの SafeAreaProvider が不要なため
-//    シンプルな View ラッパーに差し替える
+//    シンプルな View ラッパーに差し替える。
 // ─────────────────────────────────────────────────────────────
 jest.mock('react-native-safe-area-context', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -102,7 +147,7 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 7. react-native-google-mobile-ads のモック
+// 8. react-native-google-mobile-ads のモック
 //    ネイティブモジュール（RNGoogleMobileAdsModule）は Jest (Node.js) 環境
 //    では存在しないため、BannerAd 等をダミーコンポーネントに差し替える。
 // ─────────────────────────────────────────────────────────────
@@ -140,7 +185,7 @@ jest.mock('react-native-google-mobile-ads', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 8. @react-native-firebase のモック
+// 9. @react-native-firebase のモック
 //    ネイティブモジュール（RNFBAppModule 等）は Jest (Node.js) 環境では
 //    存在しないため、必要な API をスタブに差し替える。
 // ─────────────────────────────────────────────────────────────
@@ -168,7 +213,7 @@ jest.mock('@react-native-firebase/app', () => ({
 }));
 
 // ─────────────────────────────────────────────────────────────
-// 9. lib/firebase のモック
+// 10. lib/firebase のモック
 //    lib/firebase.ts は import 時に initializeAppCheck() を実行し、
 //    その非同期処理が Jest ワーカーに残留して open handle 警告を引き起こす。
 //    グローバルモックとして差し替えることで非同期処理の残留を防ぐ。

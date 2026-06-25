@@ -108,3 +108,6 @@ export const DIFFICULTY_LEVELS: DifficultyLevel[] = [
 ];
 
 export const TOTAL_QUESTIONS = 7;
+
+/** AsyncStorage key for persisting the last-selected difficulty level */
+export const LAST_LEVEL_KEY = 'lastSelectedLevelId';

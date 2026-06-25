@@ -157,7 +157,28 @@ React Native + Firebase のクイズ形式暗算・学習アプリ。
 
 詳細な出題範囲は =features/quiz/constants.ts= を参照。
 
-* 8. 広告（AdMob）
+* 8. 難易度レベルの永続化
+
+ユーザーが「スタート！」を押した時点の難易度レベルを AsyncStorage に保存し、
+次回トップ画面表示時にそのレベルを初期選択状態にする。
+
+| 項目             | 内容                                                                |
+|------------------+---------------------------------------------------------------------|
+| ストレージキー   | =lastSelectedLevelId=（=LAST_LEVEL_KEY= 定数で管理）                |
+| 保存値           | =DifficultyId= 文字列（="M"=, ="L"=, ..., ="A"=）                  |
+| 保存タイミング   | 「スタート！」ボタン押下時（=handleStart= 内）                      |
+| 復元タイミング   | トップ画面（=DifficultySelectScreen=）マウント時の =useEffect=      |
+| 保存値なしの場合 | =selectedIndex = 0=（小学1年生）をデフォルト表示                    |
+| 無効な ID の場合 | =DIFFICULTY_LEVELS.findIndex= が =-1= → デフォルトにフォールバック |
+| 読み込み失敗時   | =.catch()= でエラー吸収し、デフォルトのまま続行                     |
+
+設計判断:
+- =selectedIndex=（数値）ではなく =DifficultyId=（文字列）を保存する。
+  =DIFFICULTY_LEVELS= 配列の順序変更に対して堅牢にするため。
+- レベルを変更しただけでスタートしなかった場合は保存しない（意図的な選択のみ記憶）。
+- ちらつき防止: =isReady= state で AsyncStorage 読み込み完了まで =opacity: 0= にする。
+
+* 9. 広告（AdMob）
 
 - フォーマット: Anchored Adaptive Banner（全画面共通）
 - SDK: =react-native-google-mobile-ads= v15.8.x（Expo SDK 54 では v16 系に互換性問題あり）
@@ -165,10 +186,10 @@ React Native + Firebase のクイズ形式暗算・学習アプリ。
 - EAS Build では =just sync-secrets= で環境変数を同期
 - エラー時は非表示化（アプリ動作に影響しない）
 
-* 9. 量産化戦略（将来計画）
+* 10. 量産化戦略（将来計画）
 Android Flavor / iOS Target を採用し、設定切り替えのみで複数ジャンルアプリを一括ビルド可能にする。
 - 暗算クイズ / 歴史年号 / 英単語 / 漢字・元素記号
 
-* 10. 運用
+* 11. 運用
 - Firebase 無料枠内での運用を目標とする
 - 予算アラート（例: 500円超過で通知）を設定し、課金スパイクを防止する

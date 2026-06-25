@@ -1,21 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
 import { LevelStepper } from '@/features/quiz/components/LevelStepper';
-import { DIFFICULTY_LEVELS, TOTAL_QUESTIONS } from '@/features/quiz';
+import { DIFFICULTY_LEVELS, TOTAL_QUESTIONS, LAST_LEVEL_KEY } from '@/features/quiz';
 
 export default function DifficultySelectScreen() {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isReady, setIsReady] = useState(false);
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];
 
   const selectedLevel = DIFFICULTY_LEVELS[selectedIndex];
 
+  // Restore last-selected level on mount
+  useEffect(() => {
+    AsyncStorage.getItem(LAST_LEVEL_KEY)
+      .then((savedId) => {
+        if (savedId) {
+          const idx = DIFFICULTY_LEVELS.findIndex((l) => l.id === savedId);
+          if (idx >= 0) setSelectedIndex(idx);
+        }
+      })
+      .catch(() => {
+        // ストレージ読み込み失敗時はデフォルト値のまま続行
+      })
+      .finally(() => setIsReady(true));
+  }, []);
+
   const handleStart = () => {
+    AsyncStorage.setItem(LAST_LEVEL_KEY, selectedLevel.id);
     router.push({
       pathname: '/quiz' as any,
       params: { levelId: selectedLevel.id },
@@ -32,7 +50,12 @@ export default function DifficultySelectScreen() {
         backgroundColor={colors.screenBackground}
       />
 
-      <View style={[styles.container, { backgroundColor: colors.screenBackground }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.screenBackground, opacity: isReady ? 1 : 0 },
+        ]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.appTitle, { color: colors.accent }]}>🧮 暗算クイズ</Text>

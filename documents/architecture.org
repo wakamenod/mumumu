@@ -62,7 +62,7 @@ Expo Router の制約上ルートファイルは =app/= 直下に置く。=src/=
 - *サーバー状態*: 現状は =useState= + =useEffect= で管理。将来的に TanStack Query を検討
 - *クライアント状態*: =useState= / =useRef= でローカル管理。グローバル状態は不使用
 - *画面間データ受け渡し*: Expo Router のクエリパラメータ（=router.push= + =useLocalSearchParams=）
-- *永続化*: AsyncStorage（最後に選択した難易度の保存のみ）
+- *永続化*: =@react-native-async-storage/async-storage= を使用。保存データは最後に選択した難易度 ID のみ（キー: =lastSelectedLevelId=）。グローバルモックは =jest.setup.ts= で定義済み
 
 * 4. 設計上の注意点
 
