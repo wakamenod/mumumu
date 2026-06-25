@@ -89,6 +89,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   experiments: {
     typedRoutes: true,
+    baseUrl: '/mumumu',
   },
   extra: {
     router: {},
