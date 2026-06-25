@@ -167,11 +167,6 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       expect(screen.getByTestId('numeric-keypad-display')).toBeTruthy();
       expect(screen.getByTestId('numeric-keypad-display').props.children).toBe('?');
     });
-
-    it('解答ルール文言が表示されている', async () => {
-      await renderQuizScreen();
-      expect(screen.getByText('【解答ルール】')).toBeTruthy();
-    });
   });
 
   // ────────────────────────────────────────────────────────────

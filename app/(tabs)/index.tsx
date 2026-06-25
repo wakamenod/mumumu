@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,6 +21,7 @@ import { DIFFICULTY_LEVELS, TOTAL_QUESTIONS, LAST_LEVEL_KEY } from '@/features/q
 export default function DifficultySelectScreen() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];
 
@@ -96,7 +106,57 @@ export default function DifficultySelectScreen() {
         >
           <Text style={styles.startButtonText}>▶　スタート！</Text>
         </AppButton>
+
+        {/* Rules link */}
+        <TouchableOpacity onPress={() => setShowRules(true)} activeOpacity={0.6}>
+          <Text style={[styles.rulesLink, { color: colors.levelDescription }]}>📖 解答ルール</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* ─ 解答ルール モーダル ─ */}
+      <Modal
+        visible={showRules}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRules(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowRules(false)}>
+          <Pressable
+            style={[
+              styles.modalCard,
+              { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
+            ]}
+            onPress={() => {
+              /* カード内タップで閉じないようにする */
+            }}
+          >
+            <Text style={[styles.modalTitle, { color: colors.accent }]}>📖 解答ルール</Text>
+
+            <View style={styles.modalRules}>
+              <Text style={[styles.modalRuleText, { color: colors.levelLabel }]}>
+                ・分数は「1/3」や「−2/5」のようにスラッシュで入力してください。
+              </Text>
+              <Text style={[styles.modalRuleText, { color: colors.levelLabel }]}>
+                ・回答は必ず既約分数（これ以上約分できない状態）にしてください。
+              </Text>
+              <Text style={[styles.modalRuleText, { color: colors.levelLabel }]}>
+                ・整数になる場合は整数（例: 3）で入力してください（「3/1」は不正解）。
+              </Text>
+              <Text style={[styles.modalRuleText, { color: colors.levelLabel }]}>
+                ・「−0」は不正解となります。
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.modalCloseButton, { backgroundColor: colors.accent }]}
+              onPress={() => setShowRules(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.modalCloseText}>閉じる</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -154,5 +214,57 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     letterSpacing: 1,
+  },
+
+  // 解答ルール リンク
+  rulesLink: {
+    fontSize: 14,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
+  },
+
+  // 解答ルール モーダル
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    gap: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  modalRules: {
+    gap: 8,
+  },
+  modalRuleText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  modalCloseButton: {
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 36,
+    borderRadius: 20,
+  },
+  modalCloseText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

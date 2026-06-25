@@ -144,6 +144,55 @@ describe('DifficultySelectScreen', () => {
     });
   });
 
+  describe('解答ルール モーダル', () => {
+    it('「📖 解答ルール」リンクが表示される', async () => {
+      await act(async () => {
+        await render(<DifficultySelectScreen />);
+      });
+      expect(screen.getByText('📖 解答ルール')).toBeTruthy();
+    });
+
+    it('初期状態ではルール文言が表示されていない', async () => {
+      await act(async () => {
+        await render(<DifficultySelectScreen />);
+      });
+      expect(screen.queryByText(/既約分数/)).toBeNull();
+    });
+
+    it('リンクを押すとモーダルが開きルール4項目が表示される', async () => {
+      await act(async () => {
+        await render(<DifficultySelectScreen />);
+      });
+
+      await act(async () => {
+        fireEvent.press(screen.getByText('📖 解答ルール'));
+      });
+
+      expect(screen.getByText(/スラッシュで入力してください/)).toBeTruthy();
+      expect(screen.getByText(/既約分数（これ以上約分できない状態）にしてください/)).toBeTruthy();
+      expect(screen.getByText(/整数になる場合は整数/)).toBeTruthy();
+      expect(screen.getByText(/「−0」は不正解となります/)).toBeTruthy();
+    });
+
+    it('「閉じる」ボタンを押すとモーダルが閉じる', async () => {
+      await act(async () => {
+        await render(<DifficultySelectScreen />);
+      });
+
+      // モーダルを開く
+      await act(async () => {
+        fireEvent.press(screen.getByText('📖 解答ルール'));
+      });
+      expect(screen.getByText(/既約分数/)).toBeTruthy();
+
+      // 閉じるボタンを押す
+      await act(async () => {
+        fireEvent.press(screen.getByText('閉じる'));
+      });
+      expect(screen.queryByText(/既約分数/)).toBeNull();
+    });
+  });
+
   describe('スタートボタン', () => {
     it('初期状態でスタートを押すと M でクイズが始まる', async () => {
       await act(async () => {

@@ -248,23 +248,6 @@ export function NumericKeypad({ onValueChange, resultState }: Props) {
         )}
       </View>
 
-      {/* ─ 解答ルール文言（§4.3） ─ */}
-      <View style={[styles.rulesBox, { borderColor: colors.accent + '44' }]}>
-        <Text style={[styles.rulesTitle, { color: colors.levelDescription }]}>【解答ルール】</Text>
-        <Text style={[styles.rulesText, { color: colors.levelDescription }]}>
-          ・分数は「1/3」や「−2/5」のようにスラッシュで入力してください。
-        </Text>
-        <Text style={[styles.rulesText, { color: colors.levelDescription }]}>
-          ・回答は必ず既約分数（これ以上約分できない状態）にしてください。
-        </Text>
-        <Text style={[styles.rulesText, { color: colors.levelDescription }]}>
-          ・整数になる場合は整数（例: 3）で入力してください（「3/1」は不正解）。
-        </Text>
-        <Text style={[styles.rulesText, { color: colors.levelDescription }]}>
-          ・「−0」は不正解となります。
-        </Text>
-      </View>
-
       {/* ─ キーパッド ─ */}
       <View style={styles.keypad}>
         {rows.map((row, rowIdx) => (
@@ -320,23 +303,6 @@ const styles = StyleSheet.create({
   },
   resultMarkWrong: {
     color: '#555555',
-  },
-
-  // 解答ルール
-  rulesBox: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    gap: 2,
-  },
-  rulesTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  rulesText: {
-    fontSize: 10,
-    lineHeight: 15,
   },
 
   // キーパッド

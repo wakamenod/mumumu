@@ -314,19 +314,6 @@ describe('NumericKeypad', () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  describe('解答ルール文言（§4.3）', () => {
-    it('ルール見出しが常に表示されている', async () => {
-      await renderKeypad();
-      expect(screen.getByText('【解答ルール】')).toBeTruthy();
-    });
-
-    it('"既約分数" のルール文言が表示されている', async () => {
-      await renderKeypad();
-      expect(screen.getByText(/既約分数（これ以上約分できない状態）にしてください/)).toBeTruthy();
-    });
-  });
-
-  // ────────────────────────────────────────────────────────────
   describe('resultState prop — 正誤オーバーレイ', () => {
     /**
      * テスト方針:
