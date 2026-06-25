@@ -69,24 +69,23 @@ describe('LevelStepper', () => {
     });
   });
 
-  describe('端点での無効化', () => {
-    it('selectedIndex=0 のとき ← ボタンが disabled になる', async () => {
+  describe('端点での循環', () => {
+    it('selectedIndex=0 のとき ← ボタンで最後のレベルに循環する', async () => {
       const onIndexChange = jest.fn();
       await renderStepper(0, onIndexChange);
 
       fireEvent.press(screen.getByLabelText('前のレベル'));
 
-      // disabled なのでコールバックは呼ばれない
-      expect(onIndexChange).not.toHaveBeenCalled();
+      expect(onIndexChange).toHaveBeenCalledWith(LAST_INDEX);
     });
 
-    it('最後のレベルのとき → ボタンが disabled になる', async () => {
+    it('最後のレベルのとき → ボタンで最初のレベルに循環する', async () => {
       const onIndexChange = jest.fn();
       await renderStepper(LAST_INDEX, onIndexChange);
 
       fireEvent.press(screen.getByLabelText('次のレベル'));
 
-      expect(onIndexChange).not.toHaveBeenCalled();
+      expect(onIndexChange).toHaveBeenCalledWith(0);
     });
   });
 

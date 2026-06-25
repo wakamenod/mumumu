@@ -1,9 +1,11 @@
 import React, { useCallback, useRef } from 'react';
 import { StyleSheet, Text, View, useColorScheme, type ViewStyle } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
+  runOnJS,
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -17,13 +19,15 @@ interface LevelStepperProps {
   onIndexChange: (index: number) => void;
 }
 
-const SPRING_CONFIG = {
-  damping: 18,
-  stiffness: 200,
-  mass: 0.8,
+const SLIDE_IN_CONFIG = {
+  duration: 180,
+  easing: Easing.out(Easing.cubic),
 };
 
 const CARD_WIDTH = 280;
+
+const SWIPE_TRANSLATION_THRESHOLD = 50;
+const SWIPE_VELOCITY_THRESHOLD = 500;
 
 function StarRating({
   stars,
@@ -99,8 +103,7 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
 
   const navigate = useCallback(
     (direction: 1 | -1) => {
-      const next = selectedIndex + direction;
-      if (next < 0 || next >= total) return;
+      const next = (((selectedIndex + direction) % total) + total) % total;
 
       directionRef.current = direction;
 
@@ -108,22 +111,36 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
       onIndexChange(next);
 
       // アニメーション（視覚的な演出のみ）— shared value mutations are intentional
-      translateX.value = withTiming(-direction * 40, { duration: 100 }, () => {
-        opacity.value = withTiming(0, { duration: 80 }, () => {
-          // Snap card in from opposite side
-          translateX.value = direction * 60;
-          opacity.value = withTiming(1, { duration: 60 }, () => {
-            translateX.value = withSpring(0, SPRING_CONFIG);
-          });
-        });
+      // 1. 現カードをスライドアウト + フェードアウト
+      translateX.value = withTiming(-direction * 50, { duration: 120 });
+      opacity.value = withTiming(0, { duration: 120 }, () => {
+        // 2. 新カードを反対側にスナップ配置
+        translateX.value = direction * 50;
+        // 3. スライドイン + フェードイン（減速カーブでスッと止まる）
+        translateX.value = withTiming(0, SLIDE_IN_CONFIG);
+        opacity.value = withTiming(1, { duration: 150 });
       });
     },
     [selectedIndex, total, translateX, opacity, onIndexChange]
   );
 
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .onEnd((event) => {
+      const { translationX, velocityX } = event;
+      const swipedLeft =
+        translationX < -SWIPE_TRANSLATION_THRESHOLD || velocityX < -SWIPE_VELOCITY_THRESHOLD;
+      const swipedRight =
+        translationX > SWIPE_TRANSLATION_THRESHOLD || velocityX > SWIPE_VELOCITY_THRESHOLD;
+
+      if (swipedLeft) {
+        runOnJS(navigate)(1);
+      } else if (swipedRight) {
+        runOnJS(navigate)(-1);
+      }
+    });
+
   const level = DIFFICULTY_LEVELS[selectedIndex];
-  const canGoBack = selectedIndex > 0;
-  const canGoForward = selectedIndex < total - 1;
 
   return (
     <View style={styles.container}>
@@ -136,12 +153,11 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
         {/* Left arrow */}
         <AppButton
           onPress={() => navigate(-1)}
-          disabled={!canGoBack}
           hitSlop={16}
           style={({ pressed }) => [
             styles.arrowButton,
             {
-              backgroundColor: canGoBack ? colors.arrowButton : colors.arrowButtonDisabled,
+              backgroundColor: colors.arrowButton,
               opacity: pressed ? 0.7 : 1,
             },
           ]}
@@ -151,22 +167,23 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
           <Text style={styles.arrowText}>‹</Text>
         </AppButton>
 
-        {/* Animated card */}
-        <View style={styles.cardWrapper}>
-          <Animated.View style={[{ width: CARD_WIDTH }, animatedStyle]}>
-            <LevelCard level={level} />
-          </Animated.View>
-        </View>
+        {/* Animated card (swipeable) */}
+        <GestureDetector gesture={swipeGesture}>
+          <View style={styles.cardWrapper}>
+            <Animated.View style={[{ width: CARD_WIDTH }, animatedStyle]}>
+              <LevelCard level={level} />
+            </Animated.View>
+          </View>
+        </GestureDetector>
 
         {/* Right arrow */}
         <AppButton
           onPress={() => navigate(1)}
-          disabled={!canGoForward}
           hitSlop={16}
           style={({ pressed }) => [
             styles.arrowButton,
             {
-              backgroundColor: canGoForward ? colors.arrowButton : colors.arrowButtonDisabled,
+              backgroundColor: colors.arrowButton,
               opacity: pressed ? 0.7 : 1,
             },
           ]}
