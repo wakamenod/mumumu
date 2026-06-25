@@ -1,291 +1,85 @@
-#+TITLE: React Native Modern Architecture Design Document
-#+AUTHOR: Watanabe Jun
+#+TITLE: アーキテクチャ設計ガイド
+#+AUTHOR: AI Generated / AI Maintained
 #+DATE: 2026-06-14
 #+OPTIONS: toc:nil num:t
 
-* 1. 概要 (Overview)
-本ドキュメントは、React Nativeにおけるモダンなアプリケーションアーキテクチャの設計指針をまとめたものである。
-従来のBridge基盤から脱却し、New Architecture、ファイルベースルーティング、およびサーバー状態管理を組み合わせることで、高いパフォーマンスとメンテナンス性を両立することを目的とする。
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 📌 本ドキュメントは AI（LLM）が実装・保守作業を行う際の
+#    参照用として作成・管理されています。
+#    人間も読みますが、主たる読者は AI です。
+#
+#    記載方針:
+#    - 技術選定の「結論」と「守るべき規約」のみ記載する
+#    - 一般的な技術知識（JSI, Fabric 等の説明）は省略する
+#    - 不採用の代替案や歴史的経緯は記載しない
+#    - コードを読めば分かる情報は省略する
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-* 2. 基盤レイヤー: New Architecture
-React Nativeの実行基盤は、従来の非同期Bridge通信からC++ベースの構造へと移行している。
+* 1. 技術スタック
 
-** 2.1 JSI (JavaScript Interface)
-- JavaScriptからネイティブ（iOS/Android）のC++オブジェクトを直接、同期的に参照・操作可能。
-- 通信オーバーヘッドが劇減。
+| レイヤー         | 技術                                                      |
+|------------------+-----------------------------------------------------------|
+| フレームワーク    | Expo SDK 54 (New Architecture 有効) + TypeScript           |
+| ルーティング     | Expo Router (ファイルシステムベース)                       |
+| アニメーション   | react-native-reanimated v4                                |
+| ハッシュ演算     | expo-crypto (SHA-256)                                     |
+| LaTeX 描画       | react-native-mathjax-html-to-svg + react-native-svg       |
+| 広告             | react-native-google-mobile-ads v15.8.x                    |
+| デジタルフォント | DSEG7Classic-Bold (SIL OFL 1.1)                           |
+| テスト           | Jest 29 + @testing-library/react-native v14               |
+| ボタン連打防止   | AppButton (Pressable ラッパー・スロットル内蔵)             |
 
-** 2.2 Fabric & TurboModules
-- *Fabric*: 新しいUI描画システム。スクロール時の白飛び防止や120FPS対応の滑らかなアニメーションを実現。
-- *TurboModules*: ネイティブ機能呼び出しの最適化。必要な時のみオンデマンドでロードされる。
+* 2. ディレクトリ規約
 
-** 2.3 Nitro Modules
-- JSIをさらに極限まで高速化する次世代ライブラリ群。デバイス上での軽量AIモデル実行や重い処理もネイティブ並みの速度で動作可能。
-
-* 3. データ・状態管理アーキテクチャ
-「サーバーから取得したデータ（Server State）」と「アプリ内部のUIの状態（Client State）」を明確に切り離す。
-
-** 3.1 サーバー状態（Server State）
-- *推奨ライブラリ*: TanStack Query (React Query)
-- *役割*: APIからのデータ取得、キャッシュ、ローディング、リトライ、ページネーションの自動管理。
-- *メリット*: 開発者が非同期処理のRedux Boilerplateを記述する必要がなくなる。
-
-** 3.2 クライアント状態（Client State）
-- *推奨ライブラリ*: Zustand
-- *役割*: モーダルの開閉、ダークモード切り替え、フォームの一時入力値などの管理。
-- *メリット*: 軽量、Hookベースで直感的に記述可能、Context APIのような不要な再レンダリングが発生しない。
-
-* 4. ディレクトリ構造・設計パターン
-
-** 4.1 Featuresベース（機能駆動型）アーキテクチャ
-コンポーネントの種類（components/, screens/）で分けるのではなく、機能（ドメイン）単位でフォルダをカプセル化する。
-Expo Router の制約上、ルートファイルは =app/= 直下に置く必要があるため、=src/= は設けず以下の構成を採用する。
+Features ベース（機能駆動型）アーキテクチャを採用する。
+Expo Router の制約上ルートファイルは =app/= 直下に置く。=src/= は設けない。
 
 #+BEGIN_SRC text
 / (プロジェクトルート)
-├── app/                    # Expo Router ファイルベースルーティング
-│   ├── _layout.tsx         # ルートスタック設定（quiz / result ルートを登録）
-│   ├── (tabs)/             # タブグループ
-│   │   ├── _layout.tsx
-│   │   ├── index.tsx       # 難易度選択画面（Tab 1: calculator アイコン）
-│   │   └── two.tsx         # ランキング画面（Tab 2: trophy アイコン）
-│   ├── quiz.tsx            # クイズ画面
-│   └── result.tsx          # 結果画面（levelId・startedAt・answers パラメータを受け取る）
-├── assets/                 # 画像・フォントなど
-├── components/             # アプリ全体で共通のUI（AppButton.tsx・AdBanner.tsx・Themed.tsx など）
-│   └── __tests__/          # 共通コンポーネントのテスト
-│       └── AdBanner.test.tsx
-├── config/                 # アプリ設定
-│   ├── admob.ts            # AdMob 広告ユニット ID（env → テスト ID フォールバック）
-│   └── __tests__/
-│       └── admob.test.ts
-├── constants/              # カラートークンなどのアプリ定数
-├── features/               # 機能ごとに閉じたカプセル
-│   └── quiz/               # クイズ機能ドメイン
-│       ├── __tests__/      # クイズ機能のテスト群
-│       │   ├── constants.test.ts
-│       │   ├── CountdownOverlay.test.tsx     # カウントダウンオーバーレイのテスト
-│       │   ├── DifficultySelectScreen.test.tsx
-│       │   ├── ElapsedTimer.test.tsx         # 経過時間タイマーのテスト（rAF・AppState・リセット）
-│       │   ├── getRanking.test.ts        # getRankingFunction のユニットテスト
-│       │   ├── InitialsEntryForm.test.tsx # InitialsEntryForm コンポーネントのテスト
-│       │   ├── LevelStepper.test.tsx
-│       │   ├── MathDisplay.test.tsx
-│       │   ├── NumericKeypad.test.tsx
-│       │   ├── QuizScreen.test.tsx
-│       │   ├── RankingScreen.test.tsx    # ランキング画面の統合テスト
-│       │   ├── RankingTable.test.tsx     # RankingTable / RankingTableHeader / RankingTableBody のテスト
-│       │   ├── registerUsername.test.ts  # registerUsernameFunction のユニットテスト
-│       │   ├── ResultScreen.test.tsx
-│       │   └── submitScore.test.ts
-│       ├── api/            # Cloud Functions 呼び出し層
-│       │   ├── getQuiz.ts          # getQuizFunction 呼び出し
-│       │   ├── getRanking.ts       # getRankingFunction 呼び出し
-│       │   ├── registerUsername.ts  # registerUsernameFunction 呼び出し
-│       │   └── submitScore.ts      # submitScoreFunction 呼び出し・RankingEntry 型定義
-│       ├── components/     # クイズ機能固有のUIコンポーネント
-│       │   ├── CountdownOverlay.tsx  # カウントダウンオーバーレイ（3-2-1 アニメーション）
-│       │   ├── ElapsedTimer.tsx      # 経過時間タイマー（rAF 駆動・AppState 対応・自己完結型）
-│       │   ├── InitialsEntryForm.tsx # イニシャル入力フォーム（3行10列ボタングリッド）
-│       │   ├── LevelStepper.tsx
-│       │   ├── MathDisplay.tsx       # LaTeX 数式レンダリング
-│       │   ├── NumericKeypad.tsx     # カスタム数値キーパッド（正誤オーバーレイ内蔵）
-│       │   └── RankingTable.tsx      # RankingTableHeader / RankingTableBody / RankingTable を export
-│       ├── types.ts        # 型定義（DifficultyLevel など）
-│       ├── constants.ts    # ドメイン定数（DIFFICULTY_LEVELS など）
-│       └── index.ts        # 外部に公開するインターフェース（barrel export）
-└── jest.setup.ts           # Jest セットアップ（モック初期化）
+├── app/              # Expo Router ルートファイル
+├── components/       # アプリ全体共通の UI コンポーネント
+├── config/           # アプリ設定（admob.ts 等）
+├── constants/        # カラートークン等の定数
+├── features/         # 機能ごとにカプセル化されたドメインモジュール
+│   └── quiz/
+│       ├── __tests__/
+│       ├── api/        # Cloud Functions 呼び出し層
+│       ├── components/ # ドメイン固有 UI
+│       ├── types.ts
+│       ├── constants.ts
+│       └── index.ts    # barrel export
+└── lib/              # Firebase 初期化等のインフラ層
 #+END_SRC
 
-** 4.2 ロジックとUIの分離（Hooksパターン）
-- *UIコンポーネント*: 状態を持たず、propsを受け取ってレンダリングする（Viewに集中）。
-- *カスタムHook*: ~useProfile.ts~ のようなHookを作り、そこにTanStack Queryの呼び出しや状態遷移のロジックを閉じ込める。
+規約:
+- 新しい機能は =features/{feature_name}/= 配下に作成する
+- 外部公開は =index.ts= の barrel export 経由のみ
+- テストは各 feature の =__tests__/= に配置する
+- 共通 UI は =components/= に配置する
 
-* 5. ルーティング (Routing)
-- *推奨ツール*: Expo Router
-- *設計*: ファイルシステムベースのルーティング（Next.jsやRemixと同等）。
-- *メリット*: ディレクトリ構造がそのまま画面遷移の階層になるため、従来の ~react-navigation~ で発生していた複雑なネスト構造の定義ファイル（Navigatorのネスト）を記述する必要がなくなる。
+* 3. 状態管理方針
 
-* 6. 推奨技術スタックまとめ
-| レイヤー             | 推奨される技術・パターン                                 |
-|----------------------+----------------------------------------------------------|
-| ベースフレームワーク | Expo (New Architecture有効) + TypeScript                 |
-| ルーティング         | Expo Router (ファイルシステムベース)                     |
-| サーバー状態管理     | TanStack Query                                           |
-| グローバル状態管理   | Zustand                                                  |
-| ディレクトリ設計     | Featuresベース + Hooksによるロジック分離                  |
-| アニメーション       | react-native-reanimated v4 (useSharedValue + withSpring) |
-| ハッシュ演算         | expo-crypto (Crypto.digestStringAsync / SHA-256)         |
-| LaTeX レンダリング   | react-native-mathjax-html-to-svg + react-native-svg     |
-| テスト               | Jest + @testing-library/react-native v14                 |
-| ボタン連打防止       | AppButton コンポーネント（Pressable ラッパー・スロットル内蔵） |
-| 広告                 | react-native-google-mobile-ads v15.8.x (Google AdMob Adaptive Banner) |
-| デジタルフォント     | DSEG7Classic (SIL Open Font License 1.1) — 7セグメント風タイマー表示 |
+- *サーバー状態*: 現状は =useState= + =useEffect= で管理。将来的に TanStack Query を検討
+- *クライアント状態*: =useState= / =useRef= でローカル管理。グローバル状態は不使用
+- *画面間データ受け渡し*: Expo Router のクエリパラメータ（=router.push= + =useLocalSearchParams=）
+- *永続化*: AsyncStorage（最後に選択した難易度の保存のみ）
 
-* 7. テスト戦略
+* 4. 設計上の注意点
 
-テスト戦略・記述規約・実践パターンの詳細は [[file:testing-guide.org][testing-guide.org]] を参照のこと。
+** 4.1 ElapsedTimer の自己完結設計
+タイマーロジックはコンポーネント内に閉じ込める。親から =startedAt= を渡すだけ。
+=setInterval= + =useState= だと親の再レンダリングが秒間100回発生するため、
+=requestAnimationFrame= 駆動 + =AppState= 監視の現設計を維持すること。
 
-* 8. 経過時間タイマー (ElapsedTimer)
+** 4.2 LaTeX 描画
+=react-native-mathjax-html-to-svg= を使用（WebView 不使用・New Architecture 対応）。
+=mathjax-full= は Metro バンドラーと非互換のため不採用。
 
-** 8.1 設計方針
-クイズ画面にて、カウントダウン完了後から経過時間をリアルタイムに表示する。
-パフォーマンスと正確性を両立するため、以下の設計を採用した。
+** 4.3 iOS ビルド（Podfile パッチ）
+=react-native-svg= の依存する =fmt= ライブラリが Apple Clang 16+ でビルドエラーになるため、
+=ios/Podfile= の =post_install= で =base.h= をパッチしている。
+=pod install= のたびに自動適用される。=ios/Podfile= は git 管理対象。
 
-** 8.2 自己完結型コンポーネント
-=ElapsedTimer= はタイマーロジックをコンポーネント内部に閉じ込めた自己完結型である。
-親コンポーネント（=quiz.tsx=）は =startedAt= (Unix timestamp ms) を props で渡すのみで、
-再レンダリングの波及が =<Text>= ノード 1 つに限定される。
-
-当初は =useElapsedTimer= フックとして =quiz.tsx= に配置していたが、
-=setInterval(10ms)= による =useState= 更新が =QuizScreen= 全体（=MathDisplay=, =NumericKeypad= 等）の
-秒間 100 回再レンダリングを引き起こすパフォーマンス問題が発生したため、リファクタリングした。
-
-** 8.3 requestAnimationFrame 駆動
-=setInterval= ではなく =requestAnimationFrame= を使用する。
-- ディスプレイのリフレッシュレート（≈60fps / 16ms）に自然に同期する。
-- 0.01 秒（百分の一秒）精度の表示に十分な更新頻度を確保する。
-- バックグラウンド時に自動的に停止し、不要な CPU 消費を避ける。
-
-** 8.4 AppState 監視によるバックグラウンド復帰対応
-=requestAnimationFrame= はバックグラウンドで停止するため、フォアグラウンド復帰時に
-即座に正確な経過時間を再表示する必要がある。
-=AppState.addEventListener('change', ...)= を監視し、状態が =active= に戻った時点で
-=Date.now() - startedAt= を再計算する。
-絶対時刻ベースの計算のため、バックグラウンド中の経過時間も自然に反映される。
-
-** 8.5 DSEG7 フォント
-経過時間の表示には 7 セグメントディスプレイ風フリーフォント「DSEG7Classic-Bold」を使用する。
-- ライセンス: SIL Open Font License 1.1（商用利用可、再配布可）
-- フォントファイル: =assets/fonts/DSEG7Classic-Bold.ttf=
-- =app/_layout.tsx= の =useFonts= でアプリ起動時に読み込む。
-- 表示形式: =mm:ss.dd=（例: =00:12.34=）
-
-* 9. LaTeX レンダリング
-
-** 9.1 採用ライブラリと選定理由
-クイズの問題文はサーバー（Firebase Storage）から LaTeX 形式の文字列として配信される。
-これをアプリ側でレンダリングするために、以下のライブラリを採用する。
-
-| ライブラリ                         | 役割                                       |
-|------------------------------------+--------------------------------------------|
-| =react-native-mathjax-html-to-svg= | LaTeX → SVG 変換（MathJax 内蔵）           |
-| =react-native-svg=                 | SVG のネイティブ描画                        |
-
-採用理由：
-- *WebView を使用しない*: ネイティブの SVG 描画のみで完結し、WebView のオーバーヘッドがない。
-- *New Architecture 対応*: 純粋 JS ライブラリのため Fabric / TurboModules の互換性問題が発生しない。
-- *MathJax 内蔵*: ライブラリ内に MathJax をバンドル済みのため、別途 MathJax のセットアップが不要。
-- *大学レベルまでの数式を網羅*: MathJax ベースのため複雑な LaTeX（積分・行列・複素数など）に対応。
-
-** 9.2 コンポーネント API
-
-=features/quiz/components/MathDisplay.tsx= がドメイン内の LaTeX 描画コンポーネントである。
-
-#+BEGIN_SRC typescript
-import { MathDisplay } from '@/features/quiz';
-
-// サーバーから受け取った LaTeX 文字列をそのまま渡す（$$ デリミタ不要）
-<MathDisplay latex={question.question} />
-<MathDisplay latex={question.question} fontSize={18} color="#1A2A6C" />
-#+END_SRC
-
-| Prop       | 型       | デフォルト  | 説明                               |
-|------------+----------+-------------+------------------------------------|
-| =latex=    | string   | （必須）    | LaTeX 文字列（デリミタなし）        |
-| =fontSize= | number   | 22          | 数式のフォントサイズ（px）          |
-| =color=    | string   | ="#1A2A6C"= | 数式の色（CSS カラー文字列）        |
-
-内部では =$$...$$= で囲んでディスプレイ数式（ブロック表示）としてレンダリングする。
-
-** 9.3 不採用とした代替案
-
-| 候補ライブラリ      | 不採用理由                                                                          |
-|---------------------+-------------------------------------------------------------------------------------|
-| =mathjax-full=      | Metro バンドラーと非互換。動的 =require= と循環依存により Hermes 実行時にクラッシュ。 |
-| =react-native-math-view= | New Architecture 非対応（旧 Bridge 前提の設計）。                              |
-| =react-native-katex= | WebView を使用するため不採用。                                                     |
-| KaTeX（単体）       | HTML を出力するが React Native でそのまま描画できず、別途 HTML レンダラーが必要。   |
-
-*=mathjax-full= の失敗経緯（記録）*:
-=mathjax-full= は Node.js 向けの LaTeX → SVG 変換が可能なライブラリだが、以下の理由で採用を断念した。
-1. *動的 =require= の問題*: TeX パッケージ読み込みに =CONFIG.require(url)= を使用するが、
-   Metro の静的解析モデルと非互換。実行時に「property 'require' doesn't exist」エラーが発生。
-2. *循環依存*: =components/loader.js= と =components/package.js= の循環依存が
-   Metro のモジュールキャッシュと衝突し、=CONFIG= が =undefined= のまま参照される。
-3. *=AllPackages= による事前登録も無効*: =AllPackages.js= の静的 import で回避を試みたが、
-   Configuration 初期化時に動的ローダーが呼ばれるため解決に至らなかった。
-
-** 9.4 iOS ビルド上の注意（Podfile パッチ）
-=react-native-svg= の追加に伴い、iOS ネイティブビルドで以下の問題が発生するため対処が必要である。
-
-*問題*: React Native が依存する C++ ライブラリ =fmt= が、Apple Clang 16+（Xcode 16 以降）で
-=FMT_STRING= の =consteval= 評価に失敗し、Xcode ビルドエラーになる。
-
-*原因*: =fmt/include/fmt/base.h= が Apple Clang 14 未満のみ consteval を無効化しており、
-Clang 16 は有効化されるが非定数文脈での =consteval= 呼び出しを拒否する。
-また =base.h= は =#ifndef= ガードなしに =#define= するためコンパイルフラグでの上書きが不可。
-
-*対処*: =ios/Podfile= の =post_install= フックで =base.h= を直接パッチし、
-全 Apple Clang バージョンで consteval を無効化する。このパッチは =pod install= のたびに自動適用される。
-
-#+BEGIN_SRC ruby
-# ios/Podfile (post_install ブロック内)
-fmt_base_h = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'base.h')
-# '#elif defined(__apple_build_version__) && __apple_build_version__ < 14000029L'
-# → '#elif defined(__apple_build_version__)'  に書き換え
-#+END_SRC
-
-このため =ios/Podfile= は =.gitignore= の例外として git 管理対象に含めている（=/ios/*= + =!/ios/Podfile=）。
-
-* 10. 広告 (AdMob バナー広告)
-** 10.1 アーキテクチャ概要
-
-#+BEGIN_SRC text
-.env.local (gitignored)          ← 実際の AdMob ID を記載
-    │
-    ├── ADMOB_IOS_APP_ID         → app.config.ts (ビルド時に Info.plist へ埋め込み)
-    │
-    └── EXPO_PUBLIC_ADMOB_IOS_*  → config/admob.ts (ランタイムで Ad Unit ID を解決)
-                                       │
-                                       └→ components/AdBanner.tsx (再利用可能な BannerAd ラッパー)
-                                              │
-                                              ├→ app/(tabs)/_layout.tsx  (タブ画面上部)
-                                              ├→ app/quiz.tsx            (クイズ画面上部)
-                                              └→ app/result.tsx          (結果画面下部)
-#+END_SRC
-
-** 10.2 主要コンポーネント
-
-*** =config/admob.ts= — 広告 ID 設定ラッパー
-=EXPO_PUBLIC_ADMOB_IOS_*= 環境変数から Ad Unit ID を読み込み、
-未設定時は =TestIds.ADAPTIVE_BANNER= （Google 公式テスト ID）にフォールバックする。
-=Platform.select= で iOS / Android を分岐し、将来の Android 対応に備える。
-
-*** =components/AdBanner.tsx= — バナー広告コンポーネント
-=BannerAd= (=react-native-google-mobile-ads=) をラップした再利用可能コンポーネント。
-- =adUnitId= prop で広告ユニット ID を受け取る
-- =BannerAdSize.ANCHORED_ADAPTIVE_BANNER= を使用（画面幅に自動適応）
-- 広告読み込みエラー時は =hasError= state で非表示化（アプリ動作に影響しない）
-- エラー時は =console.warn= でログを出力
-
-** 10.3 環境変数と EAS Secrets
-
-| 変数名                              | 用途                     | ビルド時/ランタイム |
-|--------------------------------------+--------------------------+---------------------|
-| =ADMOB_IOS_APP_ID=                  | iOS App ID (Info.plist)  | ビルド時            |
-| =EXPO_PUBLIC_ADMOB_IOS_TAB_BANNER=  | タブ画面 Ad Unit ID      | ランタイム          |
-| =EXPO_PUBLIC_ADMOB_IOS_QUIZ_BANNER= | クイズ画面 Ad Unit ID    | ランタイム          |
-| =EXPO_PUBLIC_ADMOB_IOS_RESULT_BANNER= | 結果画面 Ad Unit ID    | ランタイム          |
-
-- ローカル開発: =.env.local= に記載。Metro dev server 起動時に読み込まれる
-- EAS Build: =just sync-secrets= で EAS 環境変数に同期する（=eas env:create=）
-- =.env.example= をテンプレートとしてコミット
-
-** 10.4 Expo Config Plugin 設定
-=app.config.ts= の =plugins= 配列に =react-native-google-mobile-ads= を追加。
-=iosAppId= は =process.env.ADMOB_IOS_APP_ID= から読み込み、未設定時は Google テスト App ID にフォールバック。
-=androidAppId= は未対応だが、prebuild 時のクラッシュ防止のため Google テスト App ID を設定。
-
-** 10.5 バージョン制約
-Expo SDK 54 / React Native 0.81 では =react-native-google-mobile-ads= v16 系に
-config plugin の互換性問題（=Unexpected token 'typeof'=）があるため、v15.8.x を使用する。
+** 4.4 AdMob バージョン制約
+Expo SDK 54 / RN 0.81 では =react-native-google-mobile-ads= v16 系に
+config plugin 互換性問題があるため v15.8.x を使用する。
