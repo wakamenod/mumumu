@@ -70,25 +70,13 @@ export default function DifficultySelectScreen() {
         <View style={styles.header}>
           <Text style={[styles.appTitle, { color: colors.accent }]}>🧮 暗算クイズ</Text>
           <Text style={[styles.subtitle, { color: colors.levelDescription }]}>
-            難易度を選んでスタート！
+            難易度を選んでスタート！ (全{TOTAL_QUESTIONS}問)
           </Text>
         </View>
 
         {/* Stepper */}
         <View style={styles.stepperArea}>
           <LevelStepper selectedIndex={selectedIndex} onIndexChange={setSelectedIndex} />
-        </View>
-
-        {/* Quiz info */}
-        <View
-          style={[
-            styles.infoBox,
-            { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
-          ]}
-        >
-          <Text style={[styles.infoText, { color: colors.levelDescription }]}>
-            全 {TOTAL_QUESTIONS} 問　|　制限時間なし
-          </Text>
         </View>
 
         {/* Start button */}

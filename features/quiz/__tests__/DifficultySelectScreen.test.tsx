@@ -34,11 +34,11 @@ describe('DifficultySelectScreen', () => {
       expect(screen.getByText('🧮 暗算クイズ')).toBeTruthy();
     });
 
-    it('問題数「全 7 問」が表示される', async () => {
+    it('サブタイトルに問題数が表示される', async () => {
       await act(async () => {
         await render(<DifficultySelectScreen />);
       });
-      expect(screen.getByText(`全 ${TOTAL_QUESTIONS} 問　|　制限時間なし`)).toBeTruthy();
+      expect(screen.getByText(`難易度を選んでスタート！ (全${TOTAL_QUESTIONS}問)`)).toBeTruthy();
     });
 
     it('スタートボタンが表示される', async () => {
