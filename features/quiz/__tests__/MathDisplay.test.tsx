@@ -7,6 +7,11 @@
  *   - Props（latex / fontSize / color）が MathJaxSvg に正しく渡されるか検証する。
  *   - latex が $$ デリミタで囲まれた文字列として子要素に渡されるか検証する。
  *   - デフォルト Props（fontSize=22 / color='#1A2A6C'）の適用を検証する。
+ *
+ * 実装メモ:
+ *   MathDisplay は latex 文字列を \( ... \) デリミタで分割し、
+ *   数式部分のみ MathJaxSvg でレンダリングする。
+ *   テストでは数式部分を \( ... \) で囲んで渡す必要がある。
  */
 
 import React from 'react';
@@ -50,6 +55,11 @@ jest.mock('react-native-mathjax-html-to-svg', () => {
 
 // ─── ヘルパー ────────────────────────────────────────────────
 
+/** 数式を \( ... \) デリミタで囲むヘルパー */
+function math(expr: string): string {
+  return `\\(${expr}\\)`;
+}
+
 interface RenderOptions {
   latex: string;
   fontSize?: number;
@@ -64,74 +74,73 @@ async function renderMathDisplay(options: RenderOptions) {
 
 describe('MathDisplay', () => {
   describe('レンダリング', () => {
-    it('MathJaxSvg がレンダリングされる', async () => {
-      await renderMathDisplay({ latex: '1 + 1' });
+    it('\\( ... \\) で囲まれた数式があると MathJaxSvg がレンダリングされる', async () => {
+      await renderMathDisplay({ latex: math('1 + 1') });
       expect(screen.getByTestId('math-jax-svg')).toBeTruthy();
     });
 
-    it('children に latex が $$ デリミタで囲まれて渡される', async () => {
-      await renderMathDisplay({ latex: '\\frac{1}{2}' });
+    it('children に数式が $$ デリミタで囲まれて渡される', async () => {
+      await renderMathDisplay({ latex: math('\\frac{1}{2}') });
       expect(screen.getByTestId('math-jax-svg-children')).toHaveTextContent('$$\\frac{1}{2}$$');
     });
 
-    it('空文字列の latex も $$ で囲まれる', async () => {
-      await renderMathDisplay({ latex: '' });
-      expect(screen.getByTestId('math-jax-svg-children')).toHaveTextContent('$$$$');
+    it('\\( ... \\) がない場合はテキストのみレンダリングされる', async () => {
+      await renderMathDisplay({ latex: 'テキストのみ' });
+      expect(screen.queryByTestId('math-jax-svg')).toBeNull();
+      expect(screen.getByText('テキストのみ')).toBeTruthy();
     });
   });
 
   describe('デフォルト Props', () => {
     it('fontSize を省略すると 22 が MathJaxSvg に渡される', async () => {
-      await renderMathDisplay({ latex: 'x^2' });
-      expect(screen.getByTestId('math-jax-svg')).toHaveAccessibilityValue({
-        text: undefined,
-      });
+      await renderMathDisplay({ latex: math('x^2') });
+      expect(screen.getByTestId('math-jax-svg')).toBeTruthy();
       // accessibilityLabel でデフォルト値を確認する
       expect(screen.getByLabelText('fontSize:22 color:#1A2A6C fontCache:true')).toBeTruthy();
     });
 
     it('color を省略すると #1A2A6C が MathJaxSvg に渡される', async () => {
-      await renderMathDisplay({ latex: 'x^2' });
+      await renderMathDisplay({ latex: math('x^2') });
       expect(screen.getByLabelText('fontSize:22 color:#1A2A6C fontCache:true')).toBeTruthy();
     });
 
     it('fontCache は常に true で MathJaxSvg に渡される', async () => {
-      await renderMathDisplay({ latex: 'x^2' });
+      await renderMathDisplay({ latex: math('x^2') });
       expect(screen.getByLabelText('fontSize:22 color:#1A2A6C fontCache:true')).toBeTruthy();
     });
   });
 
   describe('カスタム Props', () => {
     it('fontSize を指定するとその値が MathJaxSvg に渡される', async () => {
-      await renderMathDisplay({ latex: 'x^2', fontSize: 36 });
+      await renderMathDisplay({ latex: math('x^2'), fontSize: 36 });
       expect(screen.getByLabelText('fontSize:36 color:#1A2A6C fontCache:true')).toBeTruthy();
     });
 
     it('color を指定するとその値が MathJaxSvg に渡される', async () => {
-      await renderMathDisplay({ latex: 'x^2', color: '#FF0000' });
+      await renderMathDisplay({ latex: math('x^2'), color: '#FF0000' });
       expect(screen.getByLabelText('fontSize:22 color:#FF0000 fontCache:true')).toBeTruthy();
     });
 
     it('fontSize と color を両方指定できる', async () => {
-      await renderMathDisplay({ latex: '\\sqrt{3}', fontSize: 18, color: '#333333' });
+      await renderMathDisplay({ latex: math('\\sqrt{3}'), fontSize: 18, color: '#333333' });
       expect(screen.getByLabelText('fontSize:18 color:#333333 fontCache:true')).toBeTruthy();
     });
   });
 
   describe('latex の内容', () => {
     it('二次方程式の解の公式を $$ で囲んで渡す', async () => {
-      const latex = '\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}';
-      await renderMathDisplay({ latex });
-      expect(screen.getByTestId('math-jax-svg-children')).toHaveTextContent(`$$${latex}$$`);
+      const expr = '\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}';
+      await renderMathDisplay({ latex: math(expr) });
+      expect(screen.getByTestId('math-jax-svg-children')).toHaveTextContent(`$$${expr}$$`);
     });
 
     it('加算式を $$ で囲んで渡す', async () => {
-      await renderMathDisplay({ latex: '1 + 1 = 2' });
+      await renderMathDisplay({ latex: math('1 + 1 = 2') });
       expect(screen.getByTestId('math-jax-svg-children')).toHaveTextContent('$$1 + 1 = 2$$');
     });
 
     it('分数式を $$ で囲んで渡す', async () => {
-      await renderMathDisplay({ latex: '\\frac{3}{4}' });
+      await renderMathDisplay({ latex: math('\\frac{3}{4}') });
       expect(screen.getByTestId('math-jax-svg-children')).toHaveTextContent('$$\\frac{3}{4}$$');
     });
   });
