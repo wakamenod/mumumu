@@ -77,7 +77,45 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 6. @react-native-firebase のモック
+// 6. react-native-google-mobile-ads のモック
+//    ネイティブモジュール（RNGoogleMobileAdsModule）は Jest (Node.js) 環境
+//    では存在しないため、BannerAd 等をダミーコンポーネントに差し替える。
+// ─────────────────────────────────────────────────────────────
+jest.mock('react-native-google-mobile-ads', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View, Text } = require('react-native');
+
+  // BannerAd のモック: unitId / size を表示し、testID で検索可能にする。
+  // jest.setup.ts は .ts ファイルのため JSX が使えず React.createElement を使用。
+  function MockBannerAd(props: Record<string, unknown>) {
+    return React.createElement(
+      View,
+      { testID: 'mock-banner-ad' },
+      React.createElement(Text, { testID: 'mock-banner-ad-unit-id' }, props.unitId),
+      React.createElement(Text, { testID: 'mock-banner-ad-size' }, props.size)
+    );
+  }
+  MockBannerAd.displayName = 'BannerAd';
+
+  return {
+    BannerAd: MockBannerAd,
+    BannerAdSize: {
+      ANCHORED_ADAPTIVE_BANNER: 'ANCHORED_ADAPTIVE_BANNER',
+      BANNER: 'BANNER',
+      LARGE_BANNER: 'LARGE_BANNER',
+      MEDIUM_RECTANGLE: 'MEDIUM_RECTANGLE',
+    },
+    TestIds: {
+      ADAPTIVE_BANNER: 'ca-app-pub-3940256099942544/9214589741',
+      BANNER: 'ca-app-pub-3940256099942544/2934735716',
+    },
+  };
+});
+
+// ─────────────────────────────────────────────────────────────
+// 7. @react-native-firebase のモック
 //    ネイティブモジュール（RNFBAppModule 等）は Jest (Node.js) 環境では
 //    存在しないため、必要な API をスタブに差し替える。
 // ─────────────────────────────────────────────────────────────
@@ -105,7 +143,7 @@ jest.mock('@react-native-firebase/app', () => ({
 }));
 
 // ─────────────────────────────────────────────────────────────
-// 7. lib/firebase のモック
+// 8. lib/firebase のモック
 //    lib/firebase.ts は import 時に initializeAppCheck() を実行し、
 //    その非同期処理が Jest ワーカーに残留して open handle 警告を引き起こす。
 //    グローバルモックとして差し替えることで非同期処理の残留を防ぐ。

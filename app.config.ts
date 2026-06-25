@@ -6,6 +6,10 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 const iosGoogleServicesFile = process.env.GOOGLE_SERVICES_IOS ?? './GoogleService-Info.plist';
 const androidGoogleServicesFile = process.env.GOOGLE_SERVICES_ANDROID ?? './google-services.json';
 
+// AdMob App ID（.env.local の ADMOB_IOS_APP_ID から取得）
+// 未設定の場合は Google 公式のサンプル App ID にフォールバック（テスト広告のみ配信）
+const admobIosAppId = process.env.ADMOB_IOS_APP_ID || 'ca-app-pub-3940256099942544~1458002511';
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'mumumu',
@@ -38,6 +42,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   android: {
+    package: 'com.wakamenod.mumumu',
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
       backgroundColor: '#ffffff',
@@ -70,6 +75,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           // ソースビルドに切り替えることで non-modular header エラーを解消する。
           buildReactNativeFromSource: true,
         },
+      },
+    ],
+    [
+      'react-native-google-mobile-ads',
+      {
+        iosAppId: admobIosAppId,
+        // Android は未対応だが、未指定だと prebuild 時にネイティブ SDK がクラッシュするため
+        // Google 公式のテスト用 App ID を設定しておく
+        androidAppId: 'ca-app-pub-3940256099942544~3347511713',
       },
     ],
   ],

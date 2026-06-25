@@ -10,8 +10,10 @@ import {
   useColorScheme,
 } from 'react-native';
 
+import { AdBanner } from '@/components/AdBanner';
 import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
+import { RESULT_BANNER_ID } from '@/config/admob';
 import { registerUsername as registerUsernameApi } from '@/features/quiz/api/registerUsername';
 import { submitScore } from '@/features/quiz/api/submitScore';
 import type {
@@ -259,6 +261,9 @@ export default function ResultScreen() {
           </Text>
         </AppButton>
       </View>
+
+      {/* ─ 広告バナー（下部） ─ */}
+      <AdBanner adUnitId={RESULT_BANNER_ID} />
     </View>
   );
 }

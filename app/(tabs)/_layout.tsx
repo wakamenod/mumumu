@@ -1,10 +1,13 @@
 import React from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AdBanner } from '@/components/AdBanner';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { TAB_BANNER_ID } from '@/config/admob';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
@@ -18,29 +21,32 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: '難易度選択',
-          headerShown: false,
-          tabBarIcon: ({ color }) => <TabBarIcon name="calculator" color={color} />,
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <AdBanner adUnitId={TAB_BANNER_ID} />
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+          // Disable the static render of the header on web
+          // to prevent a hydration error in React Navigation v6.
+          headerShown: useClientOnlyValue(false, true),
         }}
-      />
-      <Tabs.Screen
-        name="two"
-        options={{
-          title: 'ランキング',
-          tabBarIcon: ({ color }) => <TabBarIcon name="trophy" color={color} />,
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: '難易度選択',
+            headerShown: false,
+            tabBarIcon: ({ color }) => <TabBarIcon name="calculator" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="two"
+          options={{
+            title: 'ランキング',
+            tabBarIcon: ({ color }) => <TabBarIcon name="trophy" color={color} />,
+          }}
+        />
+      </Tabs>
+    </SafeAreaView>
   );
 }

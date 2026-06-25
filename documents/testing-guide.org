@@ -195,6 +195,7 @@ describe('ResultScreen', () => {
 | =expo-font=                      | =useFonts= が常に =[true, null]= を返す            |
 | =expo-splash-screen=             | ネイティブ API をスタブ化                          |
 | =react-native-safe-area-context= | =SafeAreaView= → =View= ラッパーに差し替え         |
+| =react-native-google-mobile-ads= | =BannerAd= → =MockBannerAd= に差し替え（testID 付き View） |
 | =@react-native-firebase/*=       | =app= / =functions= / =app-check= をスタブ化       |
 | =@/lib/firebase=                 | =initializeAppCheck()= の副作用を排除              |
 
@@ -611,3 +612,81 @@ just check
 
 =package.json= で =lines: 80%= のグローバル閾値が設定されている。
 対象は =features/=, =app/=, =components/= 配下の =.ts= / =.tsx= ファイル。
+
+* 14. 広告（AdMob）のテストパターン
+
+** 14.1 グローバルモック（=jest.setup.ts=）
+
+=react-native-google-mobile-ads= はネイティブモジュール（=RNGoogleMobileAdsModule=）に依存するため、
+Jest 環境では動作しない。=jest.setup.ts= で =MockBannerAd= に差し替えている。
+
+#+BEGIN_SRC typescript
+jest.mock('react-native-google-mobile-ads', () => {
+  const React = require('react');
+  const { View, Text } = require('react-native');
+
+  // testID 付きの View で BannerAd を模倣
+  function MockBannerAd(props: Record<string, unknown>) {
+    return React.createElement(
+      View,
+      { testID: 'mock-banner-ad' },
+      React.createElement(Text, { testID: 'mock-banner-ad-unit-id' }, props.unitId),
+      React.createElement(Text, { testID: 'mock-banner-ad-size' }, props.size)
+    );
+  }
+
+  return {
+    BannerAd: MockBannerAd,
+    BannerAdSize: { ANCHORED_ADAPTIVE_BANNER: 'ANCHORED_ADAPTIVE_BANNER', ... },
+    TestIds: { ADAPTIVE_BANNER: 'ca-app-pub-3940256099942544/9214589741', ... },
+  };
+});
+#+END_SRC
+
+=jest.setup.ts= は =.ts= ファイルのため JSX が使えない。=React.createElement= を使用する。
+
+** 14.2 =onAdFailedToLoad= コールバックのキャプチャパターン
+
+=AdBanner.test.tsx= では、=BannerAd= の =onAdFailedToLoad= をテストから発火するために、
+テストファイル内でモックを上書きし、コールバックを外部変数にキャプチャするパターンを使用する。
+
+#+BEGIN_SRC typescript
+let capturedOnAdFailedToLoad: ((error: { message: string }) => void) | undefined;
+
+jest.mock('react-native-google-mobile-ads', () => {
+  // ... MockBannerAd 内で:
+  function MockBannerAd(props) {
+    capturedOnAdFailedToLoad = props.onAdFailedToLoad; // キャプチャ
+    return ( /* ... */ );
+  }
+  // ...
+});
+
+// テスト内で発火:
+await act(async () => {
+  capturedOnAdFailedToLoad?.({ message: 'No fill' });
+});
+#+END_SRC
+
+エラーテストでは =console.warn= を =jest.spyOn= で抑制し、テスト出力をクリーンに保つ。
+
+** 14.3 環境変数テスト（=jest.resetModules= パターン）
+
+=config/admob.ts= はモジュール読み込み時に =process.env= を評価するため、
+テストケースごとに =jest.resetModules()= でモジュールキャッシュをリセットし、=require()= で再読み込みする。
+
+#+BEGIN_SRC typescript
+afterEach(() => {
+  process.env = { ...originalEnv }; // 環境変数を復元
+  jest.resetModules();              // モジュールキャッシュをリセット
+});
+
+it('環境変数が未設定の場合テスト ID にフォールバック', () => {
+  delete process.env.EXPO_PUBLIC_ADMOB_IOS_TAB_BANNER;
+  const { TAB_BANNER_ID } = require('@/config/admob');
+  expect(TAB_BANNER_ID).toBe(TEST_IDS.ADAPTIVE_BANNER);
+});
+#+END_SRC
+
+このパターンでは =import= ではなく =require()= が必須のため、
+ファイル先頭に =/* eslint-disable @typescript-eslint/no-require-imports */= を記載する。

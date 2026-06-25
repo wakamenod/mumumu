@@ -137,6 +137,53 @@ test-watch:
     npx jest --watch
 
 # ───────────────────────────────────────────
+# EAS Secrets
+# ───────────────────────────────────────────
+
+# .env.local の値を EAS 環境変数に同期（EXPO_PUBLIC_* と ADMOB_* を対象）
+# 全ビルドプロファイル (production, preview, development) に登録する
+sync-secrets:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ENV_FILE=".env.local"
+    if [ ! -f "$ENV_FILE" ]; then
+        echo "❌ $ENV_FILE が見つかりません"; exit 1
+    fi
+    echo "📤 $ENV_FILE → EAS 環境変数に同期します..."
+    count=0
+    while IFS= read -r line || [ -n "$line" ]; do
+        # 空行・コメント行をスキップ
+        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+        key="${line%%=*}"
+        value="${line#*=}"
+        # EXPO_PUBLIC_* または ADMOB_* のみ対象
+        if [[ "$key" == EXPO_PUBLIC_* || "$key" == ADMOB_* ]]; then
+            # EXPO_PUBLIC_* はビルド後のバンドルに埋め込まれるため secret 不可
+            if [[ "$key" == EXPO_PUBLIC_* ]]; then
+                vis="sensitive"
+            else
+                vis="secret"
+            fi
+            echo "  → $key ($vis)"
+            npx eas-cli env:create \
+                --name "$key" \
+                --value "$value" \
+                --environment production preview development \
+                --visibility "$vis" \
+                --type string \
+                --scope project \
+                --force \
+                --non-interactive < /dev/null
+            count=$((count + 1))
+        fi
+    done < "$ENV_FILE"
+    echo "✅ $count 件の環境変数を同期しました"
+
+# EAS 環境変数の一覧を表示
+list-secrets:
+    npx eas-cli env:list
+
+# ───────────────────────────────────────────
 # 依存関係
 # ───────────────────────────────────────────
 
@@ -158,11 +205,11 @@ upgrade:
 
 # ネイティブプロジェクトを生成 (ios/ android/ ディレクトリ)
 prebuild:
-    npx expo prebuild
+    npx expo prebuild --platform ios
 
 # ネイティブプロジェクトをクリーンして再生成
 prebuild-clean:
-    npx expo prebuild --clean
+    npx expo prebuild --clean --platform ios
 
 # ───────────────────────────────────────────
 # キャッシュ / クリーン

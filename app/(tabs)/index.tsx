@@ -23,7 +23,10 @@ export default function DifficultySelectScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.screenBackground }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: colors.screenBackground }]}
+      edges={['bottom', 'left', 'right']}
+    >
       <StatusBar
         barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={colors.screenBackground}

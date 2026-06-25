@@ -3,8 +3,10 @@ import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
+import { AdBanner } from '@/components/AdBanner';
 import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
+import { QUIZ_BANNER_ID } from '@/config/admob';
 import {
   CountdownOverlay,
   DIFFICULTY_LEVELS,
@@ -171,6 +173,9 @@ export default function QuizScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.screenBackground }]}>
+      {/* ─ 広告バナー（上部） ─ */}
+      <AdBanner adUnitId={QUIZ_BANNER_ID} />
+
       {/* ─ ヘッダー ─ */}
       <View style={styles.header}>
         {fetchState.status === 'success' && !showCountdown && (

@@ -51,7 +51,13 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 │   ├── quiz.tsx            # クイズ画面
 │   └── result.tsx          # 結果画面（levelId・startedAt・answers パラメータを受け取る）
 ├── assets/                 # 画像・フォントなど
-├── components/             # アプリ全体で共通のUI（AppButton.tsx・Themed.tsx など）
+├── components/             # アプリ全体で共通のUI（AppButton.tsx・AdBanner.tsx・Themed.tsx など）
+│   └── __tests__/          # 共通コンポーネントのテスト
+│       └── AdBanner.test.tsx
+├── config/                 # アプリ設定
+│   ├── admob.ts            # AdMob 広告ユニット ID（env → テスト ID フォールバック）
+│   └── __tests__/
+│       └── admob.test.ts
 ├── constants/              # カラートークンなどのアプリ定数
 ├── features/               # 機能ごとに閉じたカプセル
 │   └── quiz/               # クイズ機能ドメイン
@@ -112,6 +118,7 @@ Expo Router の制約上、ルートファイルは =app/= 直下に置く必要
 | LaTeX レンダリング   | react-native-mathjax-html-to-svg + react-native-svg     |
 | テスト               | Jest + @testing-library/react-native v14                 |
 | ボタン連打防止       | AppButton コンポーネント（Pressable ラッパー・スロットル内蔵） |
+| 広告                 | react-native-google-mobile-ads v15.8.x (Google AdMob Adaptive Banner) |
 | デジタルフォント     | DSEG7Classic (SIL Open Font License 1.1) — 7セグメント風タイマー表示 |
 
 * 7. テスト戦略
@@ -229,3 +236,56 @@ fmt_base_h = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'base.h'
 #+END_SRC
 
 このため =ios/Podfile= は =.gitignore= の例外として git 管理対象に含めている（=/ios/*= + =!/ios/Podfile=）。
+
+* 10. 広告 (AdMob バナー広告)
+** 10.1 アーキテクチャ概要
+
+#+BEGIN_SRC text
+.env.local (gitignored)          ← 実際の AdMob ID を記載
+    │
+    ├── ADMOB_IOS_APP_ID         → app.config.ts (ビルド時に Info.plist へ埋め込み)
+    │
+    └── EXPO_PUBLIC_ADMOB_IOS_*  → config/admob.ts (ランタイムで Ad Unit ID を解決)
+                                       │
+                                       └→ components/AdBanner.tsx (再利用可能な BannerAd ラッパー)
+                                              │
+                                              ├→ app/(tabs)/_layout.tsx  (タブ画面上部)
+                                              ├→ app/quiz.tsx            (クイズ画面上部)
+                                              └→ app/result.tsx          (結果画面下部)
+#+END_SRC
+
+** 10.2 主要コンポーネント
+
+*** =config/admob.ts= — 広告 ID 設定ラッパー
+=EXPO_PUBLIC_ADMOB_IOS_*= 環境変数から Ad Unit ID を読み込み、
+未設定時は =TestIds.ADAPTIVE_BANNER= （Google 公式テスト ID）にフォールバックする。
+=Platform.select= で iOS / Android を分岐し、将来の Android 対応に備える。
+
+*** =components/AdBanner.tsx= — バナー広告コンポーネント
+=BannerAd= (=react-native-google-mobile-ads=) をラップした再利用可能コンポーネント。
+- =adUnitId= prop で広告ユニット ID を受け取る
+- =BannerAdSize.ANCHORED_ADAPTIVE_BANNER= を使用（画面幅に自動適応）
+- 広告読み込みエラー時は =hasError= state で非表示化（アプリ動作に影響しない）
+- エラー時は =console.warn= でログを出力
+
+** 10.3 環境変数と EAS Secrets
+
+| 変数名                              | 用途                     | ビルド時/ランタイム |
+|--------------------------------------+--------------------------+---------------------|
+| =ADMOB_IOS_APP_ID=                  | iOS App ID (Info.plist)  | ビルド時            |
+| =EXPO_PUBLIC_ADMOB_IOS_TAB_BANNER=  | タブ画面 Ad Unit ID      | ランタイム          |
+| =EXPO_PUBLIC_ADMOB_IOS_QUIZ_BANNER= | クイズ画面 Ad Unit ID    | ランタイム          |
+| =EXPO_PUBLIC_ADMOB_IOS_RESULT_BANNER= | 結果画面 Ad Unit ID    | ランタイム          |
+
+- ローカル開発: =.env.local= に記載。Metro dev server 起動時に読み込まれる
+- EAS Build: =just sync-secrets= で EAS 環境変数に同期する（=eas env:create=）
+- =.env.example= をテンプレートとしてコミット
+
+** 10.4 Expo Config Plugin 設定
+=app.config.ts= の =plugins= 配列に =react-native-google-mobile-ads= を追加。
+=iosAppId= は =process.env.ADMOB_IOS_APP_ID= から読み込み、未設定時は Google テスト App ID にフォールバック。
+=androidAppId= は未対応だが、prebuild 時のクラッシュ防止のため Google テスト App ID を設定。
+
+** 10.5 バージョン制約
+Expo SDK 54 / React Native 0.81 では =react-native-google-mobile-ads= v16 系に
+config plugin の互換性問題（=Unexpected token 'typeof'=）があるため、v15.8.x を使用する。

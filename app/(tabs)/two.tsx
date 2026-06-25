@@ -70,7 +70,7 @@ export default function RankingScreen() {
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: colors.screenBackground }]}
-      edges={['top', 'left', 'right']}
+      edges={['left', 'right']}
     >
       {/* ─ ページタイトル ─ */}
       <Text style={[styles.pageTitle, { color: colors.levelLabel }]}>ランキング</Text>
