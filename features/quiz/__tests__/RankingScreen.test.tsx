@@ -101,12 +101,13 @@ describe('RankingScreen', () => {
       });
     });
 
-    it('タブに 13 レベルすべての ID（A〜M）が表示される', async () => {
+    it('左右の矢印ボタン（前のレベル・次のレベル）が表示される', async () => {
       await renderRankingScreen();
 
-      for (const level of DIFFICULTY_LEVELS) {
-        expect(screen.getByLabelText(`${level.id} ${level.label}`)).toBeTruthy();
-      }
+      await waitFor(() => {
+        expect(screen.getByLabelText('前のレベル')).toBeTruthy();
+        expect(screen.getByLabelText('次のレベル')).toBeTruthy();
+      });
     });
   });
 
@@ -275,54 +276,55 @@ describe('RankingScreen', () => {
       callable.mockResolvedValue({ data: { rankings: MOCK_RANKINGS } });
     });
 
-    it('別のタブをタップすると、そのレベルで callable が呼ばれる', async () => {
+    it('「次のレベル」ボタンをタップすると次のレベルで callable が呼ばれる', async () => {
       await renderRankingScreen();
 
       await waitFor(() => {
         expect(callable).toHaveBeenCalledTimes(1);
       });
 
-      // 「A 大学・一般」タブを選択する
-      const levelA = DIFFICULTY_LEVELS.find((l) => l.id === 'A')!;
+      // 「次のレベル」で M → L に切り替える
       await act(async () => {
-        fireEvent.press(screen.getByLabelText(`${levelA.id} ${levelA.label}`));
+        fireEvent.press(screen.getByLabelText('次のレベル'));
       });
 
+      const levelL = DIFFICULTY_LEVELS[1]; // L = 小学2年生
       await waitFor(() => {
-        expect(callable).toHaveBeenCalledWith({ level: 'A' });
+        expect(callable).toHaveBeenCalledWith({ level: levelL.id });
       });
     });
 
     it('レベル切り替え後に選択レベルの label が表示される', async () => {
       await renderRankingScreen();
 
-      const levelG = DIFFICULTY_LEVELS.find((l) => l.id === 'G')!;
+      // 「次のレベル」を1回タップ → M → L（小学2年生）
       await act(async () => {
-        fireEvent.press(screen.getByLabelText(`${levelG.id} ${levelG.label}`));
+        fireEvent.press(screen.getByLabelText('次のレベル'));
       });
 
+      const levelL = DIFFICULTY_LEVELS[1];
       await waitFor(() => {
-        expect(screen.getByText(levelG.label)).toBeTruthy();
+        expect(screen.getByText(levelL.label)).toBeTruthy();
       });
     });
 
-    it('同じタブを2回タップしても callable に渡される level は常に同じ値である', async () => {
+    it('「前のレベル」で循環し、先頭から末尾（大学・一般）へ切り替わる', async () => {
       await renderRankingScreen();
 
       await waitFor(() => {
         expect(callable).toHaveBeenCalledWith({ level: 'M' });
       });
 
-      const levelM = DIFFICULTY_LEVELS[0]; // M はインデックス0
-      // 既に選択中の M タブを再タップ
+      // 先頭（M）で「前のレベル」→ 末尾（A = 大学・一般）に循環
       await act(async () => {
-        fireEvent.press(screen.getByLabelText(`${levelM.id} ${levelM.label}`));
+        fireEvent.press(screen.getByLabelText('前のレベル'));
       });
 
-      // 呼ばれた回数によらず、すべての呼び出しで level は 'M' であること
-      for (const call of callable.mock.calls) {
-        expect(call[0]).toEqual({ level: 'M' });
-      }
+      const lastLevel = DIFFICULTY_LEVELS[DIFFICULTY_LEVELS.length - 1];
+      await waitFor(() => {
+        expect(callable).toHaveBeenCalledWith({ level: lastLevel.id });
+        expect(screen.getByText(lastLevel.label)).toBeTruthy();
+      });
     });
   });
 });

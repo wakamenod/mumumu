@@ -43,6 +43,7 @@ export default function TabLayout() {
           name="two"
           options={{
             title: 'ランキング',
+            headerShown: false,
             tabBarIcon: ({ color }) => <TabBarIcon name="trophy" color={color} />,
           }}
         />

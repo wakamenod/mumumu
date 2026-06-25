@@ -201,7 +201,6 @@ export function RankingTableBody({
 export function RankingTable({ rankings, myRank, colors }: RankingTableProps) {
   return (
     <View style={styles.rankingContainer}>
-      <Text style={[styles.rankingTitle, { color: colors.levelLabel }]}>ランキング</Text>
       <RankingTableHeader colors={colors} />
       <RankingTableBody rankings={rankings} myRank={myRank} colors={colors} />
     </View>
@@ -215,11 +214,7 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 8,
   },
-  rankingTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
+
   rankingRow: {
     flexDirection: 'row',
     alignItems: 'center',

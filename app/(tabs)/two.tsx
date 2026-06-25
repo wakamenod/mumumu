@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   useColorScheme,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -34,8 +36,6 @@ export default function RankingScreen() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'loading' });
 
-  const tabScrollRef = useRef<ScrollView>(null);
-
   const selectedLevel = DIFFICULTY_LEVELS[selectedIndex];
 
   // ─ ランキング取得 ──────────────────────────────────────────────────────────
@@ -57,128 +57,175 @@ export default function RankingScreen() {
 
   // ─ レベル切替ハンドラ ──────────────────────────────────────────────────────
 
-  const handleSelectLevel = (index: number) => {
-    setSelectedIndex(index);
-    // 選択されたタブがビューに収まるようスクロールする
-    tabScrollRef.current?.scrollTo({ x: index * TAB_ITEM_WIDTH - TAB_ITEM_WIDTH, animated: true });
-  };
+  const goToPrevLevel = useCallback(() => {
+    setSelectedIndex((prev) => (prev <= 0 ? DIFFICULTY_LEVELS.length - 1 : prev - 1));
+  }, []);
 
-  // ─ 星表示ヘルパー ──────────────────────────────────────────────────────────
+  const goToNextLevel = useCallback(() => {
+    setSelectedIndex((prev) => (prev >= DIFFICULTY_LEVELS.length - 1 ? 0 : prev + 1));
+  }, []);
 
-  const starsLabel = '★'.repeat(selectedLevel.stars) + '☆'.repeat(5 - selectedLevel.stars);
+  // ─ スワイプジェスチャー ────────────────────────────────────────────────────
+
+  const swipeHandled = useSharedValue(false);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-30, 30]) // 横方向 30px 超えたら Pan 開始（縦スクロールと干渉しない）
+    .onStart(() => {
+      'worklet';
+      swipeHandled.value = false;
+    })
+    .onUpdate((e) => {
+      'worklet';
+      if (swipeHandled.value) return;
+      if (e.translationX < -50) {
+        swipeHandled.value = true;
+        runOnJS(goToNextLevel)();
+      } else if (e.translationX > 50) {
+        swipeHandled.value = true;
+        runOnJS(goToPrevLevel)();
+      }
+    });
 
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: colors.screenBackground }]}
       edges={['left', 'right']}
     >
-      {/* ─ ページタイトル ─ */}
-      <Text style={[styles.pageTitle, { color: colors.levelLabel }]}>ランキング</Text>
-
-      {/* ─ レベルタブ（横スクロール） ─ */}
-      <View
-        style={[
-          styles.tabBarWrapper,
-          { borderBottomColor: colors.cardBorder, backgroundColor: colors.cardBackground },
-        ]}
-      >
-        <ScrollView
-          ref={tabScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabBarContent}
-        >
-          {DIFFICULTY_LEVELS.map((level, index) => {
-            const isSelected = index === selectedIndex;
-            return (
-              <TouchableOpacity
-                key={level.id}
-                style={[styles.tabItem, { width: TAB_ITEM_WIDTH }]}
-                onPress={() => handleSelectLevel(index)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: isSelected }}
-                accessibilityLabel={`${level.id} ${level.label}`}
-              >
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    isSelected
-                      ? { color: colors.accent, fontWeight: '700' }
-                      : { color: colors.levelDescription },
-                  ]}
-                >
-                  {level.id}
-                </Text>
-                {isSelected && (
-                  <View style={[styles.tabUnderline, { backgroundColor: colors.accent }]} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* ─ 選択中レベルの説明 ─ */}
-      <View style={[styles.levelInfo, { backgroundColor: colors.cardBackground }]}>
-        <Text style={[styles.levelInfoLabel, { color: colors.levelLabel }]}>
-          {selectedLevel.label}
-        </Text>
-        <Text style={[styles.levelInfoStars, { color: colors.starActive }]}>{starsLabel}</Text>
-      </View>
+      {/* ─ 見出し + レベルタイトル ─ */}
+      <Text style={[styles.screenHeading, { color: colors.levelDescription }]}>ランキング</Text>
+      <Text style={[styles.levelTitle, { color: colors.levelLabel }]}>{selectedLevel.label}</Text>
 
       {/* ─ コンテンツエリア ─ */}
       {fetchState.status === 'loading' && (
-        <View style={styles.centerArea}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.levelDescription }]}>
-            読み込み中...
-          </Text>
-        </View>
+        <GestureDetector gesture={panGesture}>
+          <View style={styles.contentWithArrows}>
+            <Pressable
+              onPress={goToPrevLevel}
+              style={styles.arrowButton}
+              accessibilityLabel="前のレベル"
+            >
+              <Text style={[styles.arrowText, { color: colors.levelLabel }]}>◀</Text>
+            </Pressable>
+
+            <View style={styles.centerArea}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={[styles.loadingText, { color: colors.levelDescription }]}>
+                読み込み中...
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={goToNextLevel}
+              style={styles.arrowButton}
+              accessibilityLabel="次のレベル"
+            >
+              <Text style={[styles.arrowText, { color: colors.levelLabel }]}>▶</Text>
+            </Pressable>
+          </View>
+        </GestureDetector>
       )}
 
       {fetchState.status === 'error' && (
-        <View style={styles.centerArea}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={[styles.errorLabel, { color: colors.levelLabel }]}>
-            エラーが発生しました
-          </Text>
-          <Text style={[styles.errorMessage, { color: colors.levelDescription }]}>
-            {fetchState.message}
-          </Text>
-          <AppButton
-            style={[styles.retryButton, { backgroundColor: colors.accent }]}
-            onPress={() => fetchRanking(selectedLevel.id)}
-            accessibilityLabel="再試行"
-          >
-            <Text style={styles.retryButtonText}>再試行</Text>
-          </AppButton>
-        </View>
+        <GestureDetector gesture={panGesture}>
+          <View style={styles.contentWithArrows}>
+            <Pressable
+              onPress={goToPrevLevel}
+              style={styles.arrowButton}
+              accessibilityLabel="前のレベル"
+            >
+              <Text style={[styles.arrowText, { color: colors.levelLabel }]}>◀</Text>
+            </Pressable>
+
+            <View style={styles.centerArea}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={[styles.errorLabel, { color: colors.levelLabel }]}>
+                エラーが発生しました
+              </Text>
+              <Text style={[styles.errorMessage, { color: colors.levelDescription }]}>
+                {fetchState.message}
+              </Text>
+              <AppButton
+                style={[styles.retryButton, { backgroundColor: colors.accent }]}
+                onPress={() => fetchRanking(selectedLevel.id)}
+                accessibilityLabel="再試行"
+              >
+                <Text style={styles.retryButtonText}>再試行</Text>
+              </AppButton>
+            </View>
+
+            <Pressable
+              onPress={goToNextLevel}
+              style={styles.arrowButton}
+              accessibilityLabel="次のレベル"
+            >
+              <Text style={[styles.arrowText, { color: colors.levelLabel }]}>▶</Text>
+            </Pressable>
+          </View>
+        </GestureDetector>
       )}
 
       {fetchState.status === 'success' && fetchState.rankings.length === 0 && (
-        <View style={styles.centerArea}>
-          <Text style={styles.emptyIcon}>🏆</Text>
-          <Text style={[styles.emptyText, { color: colors.levelDescription }]}>
-            まだランキングデータがありません
-          </Text>
-        </View>
+        <GestureDetector gesture={panGesture}>
+          <View style={styles.contentWithArrows}>
+            <Pressable
+              onPress={goToPrevLevel}
+              style={styles.arrowButton}
+              accessibilityLabel="前のレベル"
+            >
+              <Text style={[styles.arrowText, { color: colors.levelLabel }]}>◀</Text>
+            </Pressable>
+
+            <View style={styles.centerArea}>
+              <Text style={styles.emptyIcon}>🏆</Text>
+              <Text style={[styles.emptyText, { color: colors.levelDescription }]}>
+                まだランキングデータがありません
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={goToNextLevel}
+              style={styles.arrowButton}
+              accessibilityLabel="次のレベル"
+            >
+              <Text style={[styles.arrowText, { color: colors.levelLabel }]}>▶</Text>
+            </Pressable>
+          </View>
+        </GestureDetector>
       )}
 
       {fetchState.status === 'success' && fetchState.rankings.length > 0 && (
-        <ScrollView
-          contentContainerStyle={styles.rankingScrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <RankingTable rankings={fetchState.rankings} colors={colors} />
-        </ScrollView>
+        <GestureDetector gesture={panGesture}>
+          <View style={styles.contentWithArrows}>
+            <Pressable
+              onPress={goToPrevLevel}
+              style={styles.arrowButton}
+              accessibilityLabel="前のレベル"
+            >
+              <Text style={[styles.arrowText, { color: colors.levelLabel }]}>◀</Text>
+            </Pressable>
+
+            <ScrollView
+              style={styles.rankingScrollArea}
+              contentContainerStyle={styles.rankingScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <RankingTable rankings={fetchState.rankings} colors={colors} />
+            </ScrollView>
+
+            <Pressable
+              onPress={goToNextLevel}
+              style={styles.arrowButton}
+              accessibilityLabel="次のレベル"
+            >
+              <Text style={[styles.arrowText, { color: colors.levelLabel }]}>▶</Text>
+            </Pressable>
+          </View>
+        </GestureDetector>
       )}
     </SafeAreaView>
   );
 }
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const TAB_ITEM_WIDTH = 48;
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -187,54 +234,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ページタイトル
-  pageTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-
-  // タブバー
-  tabBarWrapper: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  tabBarContent: {
-    paddingHorizontal: 8,
-  },
-  tabItem: {
-    alignItems: 'center',
-    paddingVertical: 10,
-    position: 'relative',
-  },
-  tabLabel: {
-    fontSize: 15,
-  },
-  tabUnderline: {
-    position: 'absolute',
-    bottom: 0,
-    left: 6,
-    right: 6,
-    height: 2.5,
-    borderRadius: 2,
-  },
-
-  // 選択中レベルの説明行
-  levelInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  levelInfoLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  levelInfoStars: {
+  // 見出し
+  screenHeading: {
     fontSize: 13,
-    letterSpacing: 1,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingTop: 10,
+  },
+
+  // レベルタイトル
+  levelTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingTop: 2,
+    paddingBottom: 10,
+    paddingHorizontal: 20,
+  },
+
+  // 矢印付きコンテンツレイアウト
+  contentWithArrows: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  arrowButton: {
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  arrowText: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  rankingScrollArea: {
+    flex: 1,
   },
 
   // ローディング・エラー・空状態の中央表示
@@ -281,7 +316,7 @@ const styles = StyleSheet.create({
 
   // ランキングテーブル
   rankingScrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 4,
     paddingTop: 16,
     paddingBottom: 32,
   },
