@@ -5,6 +5,10 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
+import {
+  initializeAppCheck,
+  ReCaptchaV3Provider,
+} from 'firebase/app-check';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -16,6 +20,30 @@ const firebaseConfig = {
 
 // 二重初期化を防止
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App Check（reCAPTCHA v3）
+//
+// ネイティブ版は App Attest / Play Integrity を使うが、
+// Web では reCAPTCHA v3 をプロバイダとして使用する。
+//
+// 開発時はデバッグプロバイダを使用する。
+// ブラウザの DevTools コンソールにデバッグトークンが出力されるので、
+// Firebase Console > App Check > デバッグトークンを管理 で登録する。
+// ─────────────────────────────────────────────────────────────────────────────
+if (__DEV__) {
+  // デバッグプロバイダを有効化
+  // @ts-expect-error -- Firebase App Check debug token flag
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
+
+const recaptchaSiteKey = process.env.EXPO_PUBLIC_RECAPTCHA_V3_SITE_KEY;
+if (recaptchaSiteKey) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 const functionsInstance = getFunctions(app);
 
