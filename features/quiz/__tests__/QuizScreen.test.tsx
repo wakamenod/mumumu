@@ -45,7 +45,6 @@ jest.mock('expo-crypto', () => ({
 // import/first ルールの警告を抑制する。
 /* eslint-disable import/first */
 import React from 'react';
-import { Alert } from 'react-native';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import * as ExpoCrypto from 'expo-crypto';
@@ -740,14 +739,13 @@ describe('QuizScreen — NumericKeypad との統合', () => {
      *   - quiz.tsx は navigation.setOptions で headerLeft にカスタムボタンを設定する。
      *   - setOptions に渡された headerLeft コンポーネントをキャプチャし、
      *     render して onPress の振る舞いを検証する。
-     *   - クイズ進行中: ボタン押下で Alert.alert が表示され、
-     *     「中断する」で router.back()、「キャンセル」で何もしない。
+     *   - クイズ進行中: ボタン押下で ConfirmDialog（Modal）が表示され、
+     *     「中断する」で router.back()、「キャンセル」でダイアログが閉じる。
      *   - 非進行中（ローディング/カウントダウン）: ボタン押下で直接 router.back() が呼ばれる。
      */
 
     let mockSetOptions: jest.Mock;
     let mockBack: jest.Mock;
-    let alertSpy: jest.SpyInstance;
 
     /**
      * setOptions に渡された headerLeft ファクトリを呼び出し、
@@ -781,11 +779,6 @@ describe('QuizScreen — NumericKeypad との統合', () => {
         replace: jest.fn(),
         back: mockBack,
       });
-      alertSpy = jest.spyOn(Alert, 'alert');
-    });
-
-    afterEach(() => {
-      alertSpy.mockRestore();
     });
 
     it('navigation.setOptions に headerLeft が渡される', async () => {
@@ -798,23 +791,21 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       );
     });
 
-    it('クイズ進行中にヘッダー戻るボタンを押すと Alert が表示される', async () => {
+    it('クイズ進行中にヘッダー戻るボタンを押すと確認ダイアログが表示される', async () => {
       await renderQuizScreen();
 
       const onPress = getHeaderLeftOnPress();
       expect(onPress).toBeDefined();
-      onPress!();
 
-      expect(alertSpy).toHaveBeenCalledTimes(1);
-      expect(alertSpy).toHaveBeenCalledWith(
-        'クイズを中断しますか？',
-        undefined,
-        expect.arrayContaining([
-          expect.objectContaining({ text: 'キャンセル', style: 'cancel' }),
-          expect.objectContaining({ text: '中断する', style: 'destructive' }),
-        ])
-      );
-      // Alert 表示時点では router.back() は呼ばれていない
+      await act(async () => {
+        onPress!();
+      });
+
+      // ConfirmDialog が表示され、タイトルと2つのボタンが見える
+      expect(screen.getByText('クイズを中断しますか？')).toBeTruthy();
+      expect(screen.getByText('キャンセル')).toBeTruthy();
+      expect(screen.getByText('中断する')).toBeTruthy();
+      // ダイアログ表示時点では router.back() は呼ばれていない
       expect(mockBack).not.toHaveBeenCalled();
     });
 
@@ -823,17 +814,15 @@ describe('QuizScreen — NumericKeypad との統合', () => {
 
       const onPress = getHeaderLeftOnPress();
       expect(onPress).toBeDefined();
-      onPress!();
 
-      // Alert.alert の第3引数（ボタン配列）から「中断する」の onPress を取り出す
-      const buttons = alertSpy.mock.calls[0][2] as {
-        text: string;
-        onPress?: () => void;
-      }[];
-      const destructiveButton = buttons.find((b) => b.text === '中断する');
-      expect(destructiveButton).toBeDefined();
+      await act(async () => {
+        onPress!();
+      });
 
-      destructiveButton!.onPress!();
+      // 「中断する」ボタンを押す
+      await act(async () => {
+        fireEvent.press(screen.getByText('中断する'));
+      });
 
       expect(mockBack).toHaveBeenCalledTimes(1);
     });
@@ -843,23 +832,22 @@ describe('QuizScreen — NumericKeypad との統合', () => {
 
       const onPress = getHeaderLeftOnPress();
       expect(onPress).toBeDefined();
-      onPress!();
 
-      // Alert.alert の第3引数（ボタン配列）から「キャンセル」を取り出す
-      const buttons = alertSpy.mock.calls[0][2] as {
-        text: string;
-        onPress?: () => void;
-      }[];
-      const cancelButton = buttons.find((b) => b.text === 'キャンセル');
-      expect(cancelButton).toBeDefined();
+      await act(async () => {
+        onPress!();
+      });
 
-      // キャンセルボタンには onPress がないか、あっても back を呼ばない
-      cancelButton?.onPress?.();
+      // 「キャンセル」ボタンを押す
+      await act(async () => {
+        fireEvent.press(screen.getByText('キャンセル'));
+      });
 
       expect(mockBack).not.toHaveBeenCalled();
+      // ダイアログが閉じている（タイトルが消えている）
+      expect(screen.queryByText('クイズを中断しますか？')).toBeNull();
     });
 
-    it('ローディング中にヘッダー戻るボタンを押すと Alert なしで直接 router.back() が呼ばれる', async () => {
+    it('ローディング中にヘッダー戻るボタンを押すとダイアログなしで直接 router.back() が呼ばれる', async () => {
       setupLoadingResponse();
       (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
 
@@ -871,7 +859,8 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       expect(onPress).toBeDefined();
       onPress!();
 
-      expect(alertSpy).not.toHaveBeenCalled();
+      // 確認ダイアログは表示されない
+      expect(screen.queryByText('クイズを中断しますか？')).toBeNull();
       expect(mockBack).toHaveBeenCalledTimes(1);
 
       // テスト終了前に abort
@@ -880,7 +869,7 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       });
     });
 
-    it('カウントダウン中にヘッダー戻るボタンを押すと Alert なしで直接 router.back() が呼ばれる', async () => {
+    it('カウントダウン中にヘッダー戻るボタンを押すとダイアログなしで直接 router.back() が呼ばれる', async () => {
       (useLocalSearchParams as jest.Mock).mockReturnValue({ levelId: 'M' });
 
       await act(async () => {
@@ -896,7 +885,55 @@ describe('QuizScreen — NumericKeypad との統合', () => {
       expect(onPress).toBeDefined();
       onPress!();
 
-      expect(alertSpy).not.toHaveBeenCalled();
+      // 確認ダイアログは表示されない
+      expect(screen.queryByText('クイズを中断しますか？')).toBeNull();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('キャンセル後に再度戻るボタンを押すとダイアログが再表示される', async () => {
+      await renderQuizScreen();
+
+      const onPress = getHeaderLeftOnPress();
+      expect(onPress).toBeDefined();
+
+      // 1回目: ダイアログを表示 → キャンセル
+      await act(async () => {
+        onPress!();
+      });
+      expect(screen.getByText('クイズを中断しますか？')).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(screen.getByText('キャンセル'));
+      });
+      expect(screen.queryByText('クイズを中断しますか？')).toBeNull();
+
+      // 2回目: 再度戻るボタンを押すとダイアログが再表示される
+      await act(async () => {
+        onPress!();
+      });
+      expect(screen.getByText('クイズを中断しますか？')).toBeTruthy();
+      expect(screen.getByText('キャンセル')).toBeTruthy();
+      expect(screen.getByText('中断する')).toBeTruthy();
+    });
+
+    it('「中断する」を押すとダイアログが閉じてから router.back() が呼ばれる', async () => {
+      await renderQuizScreen();
+
+      const onPress = getHeaderLeftOnPress();
+      expect(onPress).toBeDefined();
+
+      await act(async () => {
+        onPress!();
+      });
+      expect(screen.getByText('クイズを中断しますか？')).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(screen.getByText('中断する'));
+      });
+
+      // ダイアログが閉じている
+      expect(screen.queryByText('クイズを中断しますか？')).toBeNull();
+      // router.back() が呼ばれている
       expect(mockBack).toHaveBeenCalledTimes(1);
     });
   });

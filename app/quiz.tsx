@@ -2,10 +2,11 @@ import * as Crypto from 'expo-crypto';
 import { HeaderBackButton } from '@react-navigation/elements';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { AdBanner } from '@/components/AdBanner';
 import { AppButton } from '@/components/AppButton';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import Colors from '@/constants/Colors';
 import { QUIZ_BANNER_ID } from '@/config/admob';
 import {
@@ -41,6 +42,8 @@ export default function QuizScreen() {
 
   // クイズ進行中かどうか（headerLeft の挙動制御に使用）
   const isQuizInProgressRef = useRef(false);
+  // 確認ダイアログの表示状態
+  const [showQuitDialog, setShowQuitDialog] = useState(false);
 
   // ヘッダータイトル・カスタム戻るボタンを設定
   useEffect(() => {
@@ -51,14 +54,7 @@ export default function QuizScreen() {
           label={t('quiz.headerBack')}
           onPress={() => {
             if (isQuizInProgressRef.current) {
-              Alert.alert(t('quiz.confirmQuit'), undefined, [
-                { text: t('quiz.cancel'), style: 'cancel' },
-                {
-                  text: t('quiz.quit'),
-                  style: 'destructive',
-                  onPress: () => router.back(),
-                },
-              ]);
+              setShowQuitDialog(true);
             } else {
               router.back();
             }
@@ -123,6 +119,16 @@ export default function QuizScreen() {
   const isQuizInProgress = fetchState.status === 'success' && !showCountdown;
   useEffect(() => {
     isQuizInProgressRef.current = isQuizInProgress;
+  }, [isQuizInProgress]);
+
+  // Web: ブラウザの戻るボタン・タブ閉じ時に確認を表示
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !isQuizInProgress) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
   }, [isQuizInProgress]);
 
   // 成功時のみ使う派生値
@@ -263,6 +269,20 @@ export default function QuizScreen() {
           </AppButton>
         </View>
       )}
+
+      {/* ─ クイズ中断確認ダイアログ ─ */}
+      <ConfirmDialog
+        visible={showQuitDialog}
+        title={t('quiz.confirmQuit')}
+        cancelLabel={t('quiz.cancel')}
+        confirmLabel={t('quiz.quit')}
+        onCancel={() => setShowQuitDialog(false)}
+        onConfirm={() => {
+          setShowQuitDialog(false);
+          router.back();
+        }}
+        destructive
+      />
     </View>
   );
 }
