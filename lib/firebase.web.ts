@@ -5,10 +5,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
-import {
-  initializeAppCheck,
-  ReCaptchaV3Provider,
-} from 'firebase/app-check';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,

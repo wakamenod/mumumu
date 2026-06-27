@@ -236,7 +236,7 @@ export default function QuizScreen() {
         {fetchState.status === 'success' && !showCountdown && currentQuestion && (
           <View style={styles.questionArea}>
             <View style={styles.mathWrapper}>
-              <MathDisplay latex={currentQuestion.question} />
+              <MathDisplay latex={currentQuestion.question} color={colors.levelLabel} />
             </View>
 
             <NumericKeypad
