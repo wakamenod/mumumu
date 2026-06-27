@@ -71,6 +71,7 @@ function RootLayoutNav() {
               title: t('nav.result'),
               headerBackVisible: false,
               gestureEnabled: false,
+              headerLeft: () => null,
             }}
           />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
