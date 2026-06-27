@@ -10,6 +10,7 @@ import Animated, {
 
 import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
+import { t } from '@/lib/i18n';
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ export function NumericKeypad({ onValueChange, resultState }: Props) {
             onPress={handleSlash}
             disabled={slashDisabled}
             throttleMs={100}
-            accessibilityLabel="スラッシュ（分数）"
+            accessibilityLabel={t('keypad.slash')}
           >
             <Text style={[styles.keyLabel, { color: colors.accent }]}>/</Text>
           </AppButton>
@@ -172,7 +173,7 @@ export function NumericKeypad({ onValueChange, resultState }: Props) {
             style={[styles.key, { flex: 1, backgroundColor: colors.cardBackground }]}
             onPress={handleSign}
             throttleMs={100}
-            accessibilityLabel={sign === '+' ? 'マイナスに切り替え' : 'プラスに切り替え'}
+            accessibilityLabel={sign === '+' ? t('keypad.switchToMinus') : t('keypad.switchToPlus')}
           >
             <Text style={[styles.keyLabel, { color: colors.accent }]}>
               {sign === '+' ? '+/−' : '+/−'}
@@ -196,7 +197,7 @@ export function NumericKeypad({ onValueChange, resultState }: Props) {
             onPress={handleBackspace}
             disabled={disabled}
             throttleMs={100}
-            accessibilityLabel="1文字削除"
+            accessibilityLabel={t('keypad.backspace')}
           >
             <Text style={[styles.keyLabel, { color: colors.levelLabel }]}>⌫</Text>
           </AppButton>

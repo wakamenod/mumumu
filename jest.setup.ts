@@ -68,6 +68,30 @@ jest.mock('expo-router', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// 3.5. expo-localization のモック
+//    テスト環境では日本語ロケールを返すようにする。
+// ─────────────────────────────────────────────────────────────
+jest.mock('expo-localization', () => ({
+  getLocales: jest.fn(() => [
+    {
+      languageTag: 'ja-JP',
+      languageCode: 'ja',
+      regionCode: 'JP',
+      currencyCode: 'JPY',
+      currencySymbol: '¥',
+      decimalSeparator: '.',
+      digitGroupingSeparator: ',',
+      textDirection: 'ltr',
+      measurementSystem: 'metric',
+      temperatureUnit: 'celsius',
+    },
+  ]),
+  getCalendars: jest.fn(() => [
+    { calendar: 'gregory', timeZone: 'Asia/Tokyo', uses24hourClock: true },
+  ]),
+}));
+
+// ─────────────────────────────────────────────────────────────
 // 4. expo-font のモック（テスト環境ではフォント読み込みをスキップ）
 // ─────────────────────────────────────────────────────────────
 jest.mock('expo-font', () => ({

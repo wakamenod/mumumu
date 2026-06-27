@@ -58,6 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     'expo-router',
+    'expo-localization',
     '@react-native-firebase/app',
     [
       '@react-native-firebase/app-check',

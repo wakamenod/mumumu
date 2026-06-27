@@ -27,6 +27,7 @@
 | 広告             | react-native-google-mobile-ads v15.8.x                    |
 | デジタルフォント | DSEG7Classic-Bold (SIL OFL 1.1)                           |
 | テスト           | Jest 29 + @testing-library/react-native v14               |
+| 多言語対応       | i18n-js + expo-localization                                |
 | ボタン連打防止   | AppButton (Pressable ラッパー・スロットル内蔵)             |
 
 * 2. ディレクトリ規約
@@ -48,7 +49,11 @@ Expo Router の制約上ルートファイルは =app/= 直下に置く。=src/=
 │       ├── types.ts
 │       ├── constants.ts
 │       └── index.ts    # barrel export
-└── lib/              # Firebase 初期化等のインフラ層
+├── lib/              # Firebase 初期化・i18n 等のインフラ層
+│   └── i18n.ts         # i18n-js 初期化 & t() エクスポート
+└── locales/          # 翻訳ファイル
+    ├── ja.ts           # 日本語（デフォルト・フォールバック）
+    └── en.ts           # 英語
 #+END_SRC
 
 規約:
@@ -83,3 +88,34 @@ Expo Router の制約上ルートファイルは =app/= 直下に置く。=src/=
 ** 4.4 AdMob バージョン制約
 Expo SDK 54 / RN 0.81 では =react-native-google-mobile-ads= v16 系に
 config plugin 互換性問題があるため v15.8.x を使用する。
+
+** 4.5 多言語対応 (i18n)
+=i18n-js= + =expo-localization= でデバイスロケールに基づく自動言語切替を実装。
+
+- 初期化: =lib/i18n.ts= で =getLocales()= → =i18n.locale= を設定
+- 翻訳: =locales/ja.ts=, =locales/en.ts= にキー・値ペアで定義
+- 使用: 各コンポーネントで =import { t } from '@/lib/i18n'= し =t('namespace.key')= で参照
+- フォールバック: マッチするロケールが無い場合は =ja= にフォールバック
+- 補間: =t('key', { name: value })= で動的値を埋め込み（i18n-js の =%{name}= 構文）
+- =DIFFICULTY_LEVELS= の =label= / =sublabel= / =description= もモジュールロード時に =t()= で解決される
+
+翻訳キーの名前空間:
+| 名前空間       | 対象                                                 |
+|----------------+------------------------------------------------------|
+| =nav=          | ナビゲーション/タブタイトル                          |
+| =home=         | 難易度選択画面（タイトル、サブタイトル、ルールモーダル） |
+| =quiz=         | クイズ画面（進捗、アラート、ボタン）                 |
+| =result=       | 結果画面（スコア、ランキング、ボタン）               |
+| =ranking=      | ランキング画面（見出し、状態メッセージ）             |
+| =rankingTable= | ランキングテーブル（ヘッダー、時間フォーマット）     |
+| =levels=       | 難易度レベル名・説明（13レベル × 3フィールド）       |
+| =common=       | 共通メッセージ（不明なエラー等）                     |
+| =a11y=         | アクセシビリティラベル（前のレベル、次のレベル）     |
+| =initials=     | イニシャル入力フォーム                               |
+| =keypad=       | テンキー                                             |
+| =notFound=     | 404画面                                              |
+
+新しい文言を追加する場合:
+1. =locales/ja.ts= と =locales/en.ts= の両方に同じキーで追加する
+2. コンポーネントで =t('namespace.key')= として参照する
+3. 動的値がある場合は =%{varName}= プレースホルダーを使う

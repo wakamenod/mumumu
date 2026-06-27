@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 
 import DebugBanner from '@/components/DebugBanner';
 import { useColorScheme } from '@/components/useColorScheme';
+import { t } from '@/lib/i18n';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -59,7 +60,7 @@ function RootLayoutNav() {
           <Stack.Screen
             name="quiz"
             options={{
-              title: 'クイズ',
+              title: t('nav.quiz'),
               headerBackVisible: false,
               gestureEnabled: false,
             }}
@@ -67,7 +68,7 @@ function RootLayoutNav() {
           <Stack.Screen
             name="result"
             options={{
-              title: '結果',
+              title: t('nav.result'),
               headerBackVisible: false,
               gestureEnabled: false,
             }}

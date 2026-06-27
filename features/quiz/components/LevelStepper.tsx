@@ -13,6 +13,7 @@ import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
 import { DIFFICULTY_LEVELS } from '../constants';
 import type { DifficultyLevel } from '../types';
+import { t } from '@/lib/i18n';
 
 interface LevelStepperProps {
   selectedIndex: number;
@@ -161,7 +162,7 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
               opacity: pressed ? 0.7 : 1,
             },
           ]}
-          accessibilityLabel="前のレベル"
+          accessibilityLabel={t('a11y.prevLevel')}
           accessibilityRole="button"
         >
           <Text style={styles.arrowText}>‹</Text>
@@ -187,7 +188,7 @@ export function LevelStepper({ selectedIndex, onIndexChange }: LevelStepperProps
               opacity: pressed ? 0.7 : 1,
             },
           ]}
-          accessibilityLabel="次のレベル"
+          accessibilityLabel={t('a11y.nextLevel')}
           accessibilityRole="button"
         >
           <Text style={styles.arrowText}>›</Text>

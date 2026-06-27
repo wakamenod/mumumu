@@ -17,6 +17,7 @@ import { AppButton } from '@/components/AppButton';
 import Colors from '@/constants/Colors';
 import { LevelStepper } from '@/features/quiz/components/LevelStepper';
 import { DIFFICULTY_LEVELS, TOTAL_QUESTIONS, LAST_LEVEL_KEY } from '@/features/quiz';
+import { t } from '@/lib/i18n';
 
 export default function DifficultySelectScreen() {
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -68,9 +69,9 @@ export default function DifficultySelectScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.appTitle, { color: colors.accent }]}>🧮 暗算クイズ</Text>
+          <Text style={[styles.appTitle, { color: colors.accent }]}>{t('home.appTitle')}</Text>
           <Text style={[styles.subtitle, { color: colors.levelDescription }]}>
-            難易度を選んでスタート！ (全{TOTAL_QUESTIONS}問)
+            {t('home.subtitle', { count: TOTAL_QUESTIONS })}
           </Text>
         </View>
 
@@ -89,15 +90,17 @@ export default function DifficultySelectScreen() {
               shadowColor: colors.startButton,
             },
           ]}
-          accessibilityLabel={`${selectedLevel.label}でクイズをスタート`}
+          accessibilityLabel={t('home.startA11y', { level: selectedLevel.label })}
           accessibilityRole="button"
         >
-          <Text style={styles.startButtonText}>▶　スタート！</Text>
+          <Text style={styles.startButtonText}>{t('home.startButton')}</Text>
         </AppButton>
 
         {/* Rules link */}
         <TouchableOpacity onPress={() => setShowRules(true)} activeOpacity={0.6}>
-          <Text style={[styles.rulesLink, { color: colors.levelDescription }]}>📖 解答ルール</Text>
+          <Text style={[styles.rulesLink, { color: colors.levelDescription }]}>
+            {t('home.rulesLink')}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -118,20 +121,22 @@ export default function DifficultySelectScreen() {
               /* カード内タップで閉じないようにする */
             }}
           >
-            <Text style={[styles.modalTitle, { color: colors.accent }]}>📖 解答ルール</Text>
+            <Text style={[styles.modalTitle, { color: colors.accent }]}>
+              {t('home.rulesTitle')}
+            </Text>
 
             <View style={styles.modalRules}>
               <Text style={[styles.modalRuleText, { color: colors.levelLabel }]}>
-                ・分数は「1/3」や「−2/5」のようにスラッシュで入力してください。
+                {t('home.rule1')}
               </Text>
               <Text style={[styles.modalRuleText, { color: colors.levelLabel }]}>
-                ・回答は必ず既約分数（これ以上約分できない状態）にしてください。
+                {t('home.rule2')}
               </Text>
               <Text style={[styles.modalRuleText, { color: colors.levelLabel }]}>
-                ・整数になる場合は整数（例: 3）で入力してください（「3/1」は不正解）。
+                {t('home.rule3')}
               </Text>
               <Text style={[styles.modalRuleText, { color: colors.levelLabel }]}>
-                ・「−0」は不正解となります。
+                {t('home.rule4')}
               </Text>
             </View>
 
@@ -140,7 +145,7 @@ export default function DifficultySelectScreen() {
               onPress={() => setShowRules(false)}
               activeOpacity={0.7}
             >
-              <Text style={styles.modalCloseText}>閉じる</Text>
+              <Text style={styles.modalCloseText}>{t('home.closeButton')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

@@ -18,6 +18,7 @@ import {
 } from '@/features/quiz';
 import type { GetQuizResponse } from '@/features/quiz';
 import type { AnswerEntry } from '@/features/quiz/api/submitScore';
+import { t } from '@/lib/i18n';
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
 
@@ -44,16 +45,16 @@ export default function QuizScreen() {
   // ヘッダータイトル・カスタム戻るボタンを設定
   useEffect(() => {
     navigation.setOptions({
-      title: level?.label ?? 'クイズ',
+      title: level?.label ?? t('nav.quiz'),
       headerLeft: () => (
         <HeaderBackButton
-          label="難易度選択"
+          label={t('quiz.headerBack')}
           onPress={() => {
             if (isQuizInProgressRef.current) {
-              Alert.alert('クイズを中断しますか？', undefined, [
-                { text: 'キャンセル', style: 'cancel' },
+              Alert.alert(t('quiz.confirmQuit'), undefined, [
+                { text: t('quiz.cancel'), style: 'cancel' },
                 {
-                  text: '中断する',
+                  text: t('quiz.quit'),
                   style: 'destructive',
                   onPress: () => router.back(),
                 },
@@ -89,7 +90,7 @@ export default function QuizScreen() {
     async function fetchQuiz() {
       if (!levelId) {
         if (!cancelled) {
-          setFetchState({ status: 'error', message: 'levelId が指定されていません' });
+          setFetchState({ status: 'error', message: t('quiz.noLevelId') });
         }
         return;
       }
@@ -105,7 +106,7 @@ export default function QuizScreen() {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
+          const message = err instanceof Error ? err.message : t('common.unknownError');
           setFetchState({ status: 'error', message });
         }
       }
@@ -191,7 +192,7 @@ export default function QuizScreen() {
           <>
             <ElapsedTimer startedAt={startedAt} color={colors.levelDescription} />
             <Text style={[styles.progress, { color: colors.levelDescription }]}>
-              問 {currentIndex + 1} / {totalCount}
+              {t('quiz.progress', { current: currentIndex + 1, total: totalCount })}
             </Text>
           </>
         )}
@@ -209,7 +210,7 @@ export default function QuizScreen() {
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={level?.color ?? colors.accent} />
             <Text style={[styles.loadingText, { color: colors.levelDescription }]}>
-              クイズを取得中...
+              {t('quiz.loading')}
             </Text>
           </View>
         )}
@@ -219,7 +220,7 @@ export default function QuizScreen() {
           <View style={styles.centered}>
             <Text style={styles.errorIcon}>❌</Text>
             <Text style={[styles.errorTitle, { color: colors.levelLabel }]}>
-              エラーが発生しました
+              {t('quiz.errorTitle')}
             </Text>
             <Text style={[styles.errorMessage, { color: colors.levelDescription }]}>
               {fetchState.message}
@@ -254,10 +255,10 @@ export default function QuizScreen() {
           <AppButton
             style={[styles.submitButton, { backgroundColor: level?.color ?? colors.accent }]}
             onPress={handleSubmit}
-            accessibilityLabel={isLastQuestion ? '回答して結果を見る' : '回答する'}
+            accessibilityLabel={isLastQuestion ? t('quiz.submitLastA11y') : t('quiz.submitA11y')}
           >
             <Text style={styles.submitButtonText}>
-              {isLastQuestion ? '回答して結果へ' : '回答'}
+              {isLastQuestion ? t('quiz.submitLast') : t('quiz.submit')}
             </Text>
           </AppButton>
         </View>

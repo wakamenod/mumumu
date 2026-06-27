@@ -18,6 +18,7 @@ import { DIFFICULTY_LEVELS } from '@/features/quiz/constants';
 import { getRanking } from '@/features/quiz/api/getRanking';
 import type { RankingEntry } from '@/features/quiz/api/submitScore';
 import { RankingTable } from '@/features/quiz/components/RankingTable';
+import { t } from '@/lib/i18n';
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ export default function RankingScreen() {
       const rankings = await getRanking(levelId);
       setFetchState({ status: 'success', rankings });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
+      const message = err instanceof Error ? err.message : t('common.unknownError');
       setFetchState({ status: 'error', message });
     }
   }, []);
@@ -93,7 +94,9 @@ export default function RankingScreen() {
       edges={['left', 'right']}
     >
       {/* ─ 見出し + レベルタイトル ─ */}
-      <Text style={[styles.screenHeading, { color: colors.levelDescription }]}>ランキング</Text>
+      <Text style={[styles.screenHeading, { color: colors.levelDescription }]}>
+        {t('ranking.heading')}
+      </Text>
       <Text style={[styles.levelTitle, { color: colors.levelLabel }]}>{selectedLevel.label}</Text>
 
       {/* ─ コンテンツエリア ─ */}
@@ -103,7 +106,7 @@ export default function RankingScreen() {
             <Pressable
               onPress={goToPrevLevel}
               style={styles.arrowButton}
-              accessibilityLabel="前のレベル"
+              accessibilityLabel={t('a11y.prevLevel')}
             >
               <Text style={[styles.arrowText, { color: colors.levelLabel }]}>◀</Text>
             </Pressable>
@@ -111,14 +114,14 @@ export default function RankingScreen() {
             <View style={styles.centerArea}>
               <ActivityIndicator size="large" color={colors.accent} />
               <Text style={[styles.loadingText, { color: colors.levelDescription }]}>
-                読み込み中...
+                {t('ranking.loading')}
               </Text>
             </View>
 
             <Pressable
               onPress={goToNextLevel}
               style={styles.arrowButton}
-              accessibilityLabel="次のレベル"
+              accessibilityLabel={t('a11y.nextLevel')}
             >
               <Text style={[styles.arrowText, { color: colors.levelLabel }]}>▶</Text>
             </Pressable>
@@ -132,7 +135,7 @@ export default function RankingScreen() {
             <Pressable
               onPress={goToPrevLevel}
               style={styles.arrowButton}
-              accessibilityLabel="前のレベル"
+              accessibilityLabel={t('a11y.prevLevel')}
             >
               <Text style={[styles.arrowText, { color: colors.levelLabel }]}>◀</Text>
             </Pressable>
@@ -140,7 +143,7 @@ export default function RankingScreen() {
             <View style={styles.centerArea}>
               <Text style={styles.errorIcon}>⚠️</Text>
               <Text style={[styles.errorLabel, { color: colors.levelLabel }]}>
-                エラーが発生しました
+                {t('ranking.errorTitle')}
               </Text>
               <Text style={[styles.errorMessage, { color: colors.levelDescription }]}>
                 {fetchState.message}
@@ -148,16 +151,16 @@ export default function RankingScreen() {
               <AppButton
                 style={[styles.retryButton, { backgroundColor: colors.accent }]}
                 onPress={() => fetchRanking(selectedLevel.id)}
-                accessibilityLabel="再試行"
+                accessibilityLabel={t('ranking.retryA11y')}
               >
-                <Text style={styles.retryButtonText}>再試行</Text>
+                <Text style={styles.retryButtonText}>{t('ranking.retry')}</Text>
               </AppButton>
             </View>
 
             <Pressable
               onPress={goToNextLevel}
               style={styles.arrowButton}
-              accessibilityLabel="次のレベル"
+              accessibilityLabel={t('a11y.nextLevel')}
             >
               <Text style={[styles.arrowText, { color: colors.levelLabel }]}>▶</Text>
             </Pressable>
@@ -171,7 +174,7 @@ export default function RankingScreen() {
             <Pressable
               onPress={goToPrevLevel}
               style={styles.arrowButton}
-              accessibilityLabel="前のレベル"
+              accessibilityLabel={t('a11y.prevLevel')}
             >
               <Text style={[styles.arrowText, { color: colors.levelLabel }]}>◀</Text>
             </Pressable>
@@ -179,14 +182,14 @@ export default function RankingScreen() {
             <View style={styles.centerArea}>
               <Text style={styles.emptyIcon}>🏆</Text>
               <Text style={[styles.emptyText, { color: colors.levelDescription }]}>
-                まだランキングデータがありません
+                {t('ranking.empty')}
               </Text>
             </View>
 
             <Pressable
               onPress={goToNextLevel}
               style={styles.arrowButton}
-              accessibilityLabel="次のレベル"
+              accessibilityLabel={t('a11y.nextLevel')}
             >
               <Text style={[styles.arrowText, { color: colors.levelLabel }]}>▶</Text>
             </Pressable>
@@ -200,7 +203,7 @@ export default function RankingScreen() {
             <Pressable
               onPress={goToPrevLevel}
               style={styles.arrowButton}
-              accessibilityLabel="前のレベル"
+              accessibilityLabel={t('a11y.prevLevel')}
             >
               <Text style={[styles.arrowText, { color: colors.levelLabel }]}>◀</Text>
             </Pressable>
@@ -216,7 +219,7 @@ export default function RankingScreen() {
             <Pressable
               onPress={goToNextLevel}
               style={styles.arrowButton}
-              accessibilityLabel="次のレベル"
+              accessibilityLabel={t('a11y.nextLevel')}
             >
               <Text style={[styles.arrowText, { color: colors.levelLabel }]}>▶</Text>
             </Pressable>

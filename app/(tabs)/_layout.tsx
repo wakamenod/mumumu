@@ -8,6 +8,7 @@ import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { TAB_BANNER_ID } from '@/config/admob';
+import { t } from '@/lib/i18n';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
@@ -34,7 +35,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: '難易度選択',
+            title: t('nav.difficultySelect'),
             headerShown: false,
             tabBarIcon: ({ color }) => <TabBarIcon name="calculator" color={color} />,
           }}
@@ -42,7 +43,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="two"
           options={{
-            title: 'ランキング',
+            title: t('nav.ranking'),
             headerShown: false,
             tabBarIcon: ({ color }) => <TabBarIcon name="trophy" color={color} />,
           }}

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Colors from '@/constants/Colors';
+import { t } from '@/lib/i18n';
 
 // ─── 定数 ────────────────────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export function InitialsEntryForm({
   return (
     <View style={styles.container}>
       {/* タイトル */}
-      <Text style={[styles.title, { color: colors.levelLabel }]}>ENTER YOUR INITIALS</Text>
+      <Text style={[styles.title, { color: colors.levelLabel }]}>{t('initials.title')}</Text>
 
       {/* ボタングリッド */}
       <View style={styles.grid}>
@@ -75,7 +76,7 @@ export function InitialsEntryForm({
                         opacity: pressed ? 0.7 : submitting ? 0.5 : 1,
                       },
                     ]}
-                    accessibilityLabel="入力完了"
+                    accessibilityLabel={t('initials.endButton')}
                     accessibilityRole="button"
                   >
                     <Text
@@ -109,7 +110,7 @@ export function InitialsEntryForm({
                         opacity: isEmpty || submitting ? 0.35 : pressed ? 0.6 : 1,
                       },
                     ]}
-                    accessibilityLabel="1文字削除"
+                    accessibilityLabel={t('initials.backspace')}
                     accessibilityRole="button"
                   >
                     <Text style={[styles.keyText, { color: colors.levelLabel }]}>←</Text>

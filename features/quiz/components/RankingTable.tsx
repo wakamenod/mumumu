@@ -10,6 +10,7 @@ import Animated, {
 
 import Colors from '@/constants/Colors';
 import type { RankingEntry } from '@/features/quiz/api/submitScore';
+import { t } from '@/lib/i18n';
 
 // ─── 定数 ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ export function padRankings(rankings: RankingEntry[]): (RankingEntry | null)[] {
 
 /** elapsed_time (秒) を表示用文字列に変換する */
 export function formatTime(seconds: number): string {
-  return `${seconds.toFixed(1)}秒`;
+  return t('rankingTable.timeSeconds', { time: seconds.toFixed(1) });
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -82,16 +83,16 @@ export function RankingTableHeader({ colors, showArrowColumn = false }: RankingT
     >
       {showArrowColumn && <View style={styles.arrowCol} />}
       <Text style={[styles.rankingHeaderCell, styles.colRank, { color: colors.levelDescription }]}>
-        順位
+        {t('rankingTable.rank')}
       </Text>
       <Text style={[styles.rankingHeaderCell, styles.colName, { color: colors.levelDescription }]}>
-        ユーザー名
+        {t('rankingTable.username')}
       </Text>
       <Text style={[styles.rankingHeaderCell, styles.colScore, { color: colors.levelDescription }]}>
-        正解数
+        {t('rankingTable.correctCount')}
       </Text>
       <Text style={[styles.rankingHeaderCell, styles.colTime, { color: colors.levelDescription }]}>
-        経過時間
+        {t('rankingTable.elapsedTime')}
       </Text>
     </View>
   );

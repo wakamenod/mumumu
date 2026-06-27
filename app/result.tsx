@@ -29,6 +29,7 @@ import {
   RankingTableHeader,
   formatTime,
 } from '@/features/quiz/components/RankingTable';
+import { t } from '@/lib/i18n';
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ export default function ResultScreen() {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
+          const message = err instanceof Error ? err.message : t('common.unknownError');
           setSubmitState({ status: 'error', message });
         }
       }
@@ -140,10 +141,7 @@ export default function ResultScreen() {
                     );
                     setInitialsSubmitted(true);
                   } catch {
-                    Alert.alert(
-                      'ユーザー名の登録に失敗しました',
-                      '通信環境を確認して再度お試しください。'
-                    );
+                    Alert.alert(t('result.registerFailed'), t('result.registerFailedMessage'));
                   } finally {
                     setIsRegistering(false);
                   }
@@ -151,7 +149,9 @@ export default function ResultScreen() {
                 submitting={isRegistering}
                 colors={colors}
               />
-              <Text style={[styles.rankingTitle, { color: colors.levelLabel }]}>ランキング</Text>
+              <Text style={[styles.rankingTitle, { color: colors.levelLabel }]}>
+                {t('result.rankingTitle')}
+              </Text>
               <RankingTableHeader colors={colors} showArrowColumn />
             </View>
 
@@ -208,7 +208,7 @@ export default function ResultScreen() {
             <View style={styles.loadingArea}>
               <ActivityIndicator size="large" color={colors.accent} />
               <Text style={[styles.loadingText, { color: colors.levelDescription }]}>
-                採点中...
+                {t('result.scoring')}
               </Text>
             </View>
           )}
@@ -218,7 +218,7 @@ export default function ResultScreen() {
             <View style={styles.errorArea}>
               <Text style={styles.errorIcon}>⚠️</Text>
               <Text style={[styles.errorLabel, { color: colors.levelLabel }]}>
-                エラーが発生しました
+                {t('result.errorTitle')}
               </Text>
               <Text style={[styles.errorMessage, { color: colors.levelDescription }]}>
                 {submitState.message}
@@ -255,10 +255,10 @@ export default function ResultScreen() {
           ]}
           onPress={() => router.replace('/')}
           disabled={isButtonDisabled}
-          accessibilityLabel="トップに戻る"
+          accessibilityLabel={t('result.goHomeA11y')}
         >
           <Text style={[styles.buttonText, isButtonDisabled && styles.buttonTextDisabled]}>
-            トップに戻る
+            {t('result.goHome')}
           </Text>
         </AppButton>
       </View>
@@ -283,7 +283,9 @@ function ScoreSummary({ correctCount, elapsedTime, colors }: ScoreSummaryProps) 
   return (
     <View style={styles.scoreSummary}>
       <View style={styles.scoreRow}>
-        <Text style={[styles.scoreLabel, { color: colors.levelDescription }]}>正解数</Text>
+        <Text style={[styles.scoreLabel, { color: colors.levelDescription }]}>
+          {t('result.correctCount')}
+        </Text>
         <Text style={[styles.scoreValue, { color: colors.accent }]}>
           {correctCount}
           <Text style={[styles.scoreUnit, { color: colors.levelDescription }]}>
@@ -294,7 +296,9 @@ function ScoreSummary({ correctCount, elapsedTime, colors }: ScoreSummaryProps) 
       </View>
       <View style={[styles.scoreDivider, { backgroundColor: colors.levelDescription }]} />
       <View style={styles.scoreRow}>
-        <Text style={[styles.scoreLabel, { color: colors.levelDescription }]}>経過時間</Text>
+        <Text style={[styles.scoreLabel, { color: colors.levelDescription }]}>
+          {t('result.elapsedTime')}
+        </Text>
         <Text style={[styles.scoreValue, { color: colors.accent }]}>{formatTime(elapsedTime)}</Text>
       </View>
     </View>
